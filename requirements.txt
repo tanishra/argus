@@ -1,0 +1,38 @@
+## Core Dependencies
+
+### Intent Engine (Layer 1)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+httpx>=0.25.0
+sse-starlette>=0.6.0
+
+### Policy Enforcement (Layer 2)
+pyyaml>=6.0
+
+### Explanation Engine (Layer 3B)
+# Uses Gemini Pro - configured via GEMINI_API_KEY
+
+### Database
+asyncpg>=0.29.0
+sqlalchemy[asyncio]>=2.0.23
+
+### Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+
+## Development Dependencies
+
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+black>=23.11.0
+flake8>=6.1.0
+mypy>=1.7.0
+
+## Environment Variables
+
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_PRO_MODEL=gemini-2.0-pro
+INTENT_LATENCY_TARGET_MS=300
+EXPLANATION_LATENCY_TARGET_MS=2000
