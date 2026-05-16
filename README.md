@@ -4,8 +4,6 @@
 
 ### AI Agent Pre-Action Authorization Gateway
 
-![ARGUS Banner](./assets/argus-banner.png)
-
 > *"Before your AI agent does anything, ARGUS asks one question: Is this what the user actually meant?"*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
