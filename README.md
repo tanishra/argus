@@ -1,11 +1,18 @@
+<div align="center">
+
 # ARGUS
+
 ### AI Agent Pre-Action Authorization Gateway
+
+![ARGUS Banner](./assets/argus-banner.png)
 
 > *"Before your AI agent does anything, ARGUS asks one question: Is this what the user actually meant?"*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-orange.svg)](https://fastapi.tiangolo.com/)
+
+</div>
 
 ## The Problem Nobody Is Solving
 
@@ -166,10 +173,4 @@ INTENT_LATENCY_TARGET_MS=300           # Default
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file.
-
----
-
-**Built for: Transforming Enterprise Through AI Hackathon**
-**Track: Agent Security & AI Governance (Track 1)**
-**Partners: Veea (Lobster Trap) + Google DeepMind (Gemini)**
+MIT License - see [LICENSE](LICENSE)
