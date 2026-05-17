@@ -1,7 +1,7 @@
 # ARGUS Frontend Development Plan
 ## UI/UX Team Blueprint
 
-**Author:** MiniMax Agent
+**Author:** ARGUS Team
 **Project:** ARGUS - AI Agent Pre-Action Authorization Gateway
 **Last Updated:** 2026-05-16
 

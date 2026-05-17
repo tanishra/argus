@@ -4,7 +4,7 @@ Demo Guide
 
 Step-by-step walkthrough for the ARGUS hackathon demo.
 
-Author: MiniMax Agent
+Author: ARGUS Team
 Project: ARGUS - AI Agent Pre-Action Authorization Gateway
 """
 
