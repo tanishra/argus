@@ -213,7 +213,7 @@ class IntentManifest(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert manifest to dictionary."""
-        return self.model_dump()
+        return self.model_dump(mode='json')
 
     @classmethod
     def from_json(cls, json_str: str) -> IntentManifest:
