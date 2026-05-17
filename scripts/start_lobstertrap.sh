@@ -22,9 +22,9 @@ if [ -f "lobster-trap/lobstertrap" ]; then
     echo "Running Lobster Trap on port 8002..."
     export USE_LOBSTER_TRAP_BINARY="true"
     ./lobster-trap/lobstertrap serve \
-        --policy configs/argus_policy.yaml \
-        --upstream http://localhost:8001 \
-        --port 8002 &
+        --policy configs/healthcare_policy.yaml \
+        --backend http://localhost:8001 \
+        --listen :8002 &
     echo "Lobster trap running in background."
 else
     echo "Lobster Trap binary not found. ARGUS will fall back to its internal Python simulated engine."
