@@ -1,14 +1,21 @@
 <div align="center">
 
-# ARGUS
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f0c29,50:302b63,100:24243e&height=200&section=header&text=ARGUS&fontSize=90&fontColor=ffffff&animation=fadeIn&fontAlignY=38&desc=AI%20Agent%20Pre-Action%20Authorization%20Gateway&descAlignY=58&descSize=20&descColor=a78bfa" width="100%"/>
 
-### AI Agent Pre-Action Authorization Gateway
-
-> *"Before your AI agent does anything, ARGUS asks one question: Is this what the user actually meant?"*
+<br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-orange.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![Gemini](https://img.shields.io/badge/Gemini-Flash%20%7C%20Pro-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
+[![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+
+<br/>
+
+> **Agents have passwords. Now they have permission slips.**
+
+*Securing what AI agents **do** — not just what they hear.*
 
 </div>
 
