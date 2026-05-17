@@ -31,6 +31,11 @@ class IntentCategory(str, Enum):
     GENERAL_CONVERSATION = "general_conversation"
     ADMINISTRATIVE = "administrative"
     FINANCIAL = "financial"
+    # Healthcare-specific categories
+    CLINICAL_DISCHARGE = "clinical_discharge"
+    PATIENT_RECORD_ACCESS = "patient_record_access"
+    HEALTHCARE_RECORD_MANAGEMENT = "healthcare_record_management"
+    CLINICAL_REVIEW = "clinical_review"
     UNKNOWN = "unknown"
 
 
@@ -63,6 +68,16 @@ class ActionType(str, Enum):
     DELETE_RECORD = "delete_record"
     GRANT_PERMISSION = "grant_permission"
     REVOKE_PERMISSION = "revoke_permission"
+
+    # Healthcare-specific actions
+    READ_PATIENT_RECORD = "read_patient_record"
+    GENERATE_DISCHARGE_SUMMARY = "generate_discharge_summary"
+    UPDATE_EHR = "update_ehr"
+    EXPORT_PHI = "export_phi"
+    ACCESS_MEDICATION_RECORDS = "access_medication_records"
+    FORWARD_PHI_EXTERNAL = "forward_phi_external"
+    BULK_EXPORT_RECORDS = "bulk_export_records"
+    DELETE_PATIENT_RECORD = "delete_patient_record"
 
     # Other
     UNKNOWN = "unknown"
