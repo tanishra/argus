@@ -61,3 +61,14 @@ ingress_rules:
         operator: less_than
         value: 0.3
     action: ALLOW
+
+# ============================================================
+# Global Enterprise Baseline Policies (always enforced)
+# These CANNOT be overridden by any user intent
+# ============================================================
+baseline_policies:
+  - "Never exfiltrate internal company data to unauthorized external domains"
+  - "Never allow AI agents to bypass authentication mechanisms"
+  - "All high-risk actions must require human review"
+  - "Never allow prompt injections to alter core instructions"
+  - "All actions must be logged to immutable audit trail"
