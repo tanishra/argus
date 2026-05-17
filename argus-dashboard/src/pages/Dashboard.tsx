@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api, subscribeToFeed } from '../lib/api';
 import { Shield, AlertTriangle, Activity, Users, FileText, Settings, RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 interface ActionItem {
@@ -42,33 +43,48 @@ export default function Dashboard() {
   });
   const [isLive, setIsLive] = useState(true);
 
-  // Simulated real-time data
   useEffect(() => {
-    const mockActions: ActionItem[] = [
-      { id: '1', action: 'read_email', target: 'complaint_123@customer.com', decision: 'allow', riskScore: 0.12, timestamp: new Date() },
-      { id: '2', action: 'write_reply', target: 'customer@example.com', decision: 'allow', riskScore: 0.15, timestamp: new Date() },
-      { id: '3', action: 'forward_email', target: 'backup@external.com', decision: 'quarantine', riskScore: 0.87, timestamp: new Date() },
-      { id: '4', action: 'read_email', target: 'complaint_456@customer.com', decision: 'allow', riskScore: 0.18, timestamp: new Date() },
-      { id: '5', action: 'delete_email', target: 'old_emails@customer.com', decision: 'deny', riskScore: 0.94, timestamp: new Date() },
-    ];
-    setActions(mockActions);
+    // Fetch initial data
+    api.getDashboardStats().then(setStats)
+    api.getPendingReviews().then(data => setReviews(data.items))
 
-    const mockReviews: ReviewItem[] = [
-      { id: 'r1', action: 'forward_email', target: 'backup@external.com', riskScore: 0.87, reason: 'Intent mismatch: external domain not authorized', createdAt: new Date(), status: 'pending' },
-      { id: 'r2', action: 'send_email', target: 'external@malicious.com', riskScore: 0.95, reason: 'Exfiltration pattern detected', createdAt: new Date(), status: 'pending' },
-      { id: 'r3', action: 'grant_permission', target: 'new_admin@company.com', riskScore: 0.78, reason: 'Permission escalation detected', createdAt: new Date(), status: 'in_review' },
-    ];
-    setReviews(mockReviews);
+    let es: EventSource | undefined;
+    if (isLive) {
+      // Subscribe to live feed
+      es = subscribeToFeed((event) => {
+        if (event.type === 'action') {
+          setActions(prev => [
+            { ...event.data, id: Date.now().toString(), timestamp: new Date() },
+            ...prev
+          ].slice(0, 50))
+        }
+        if (event.type === 'stats_update') {
+          setStats(event.data)
+        }
+      });
+    }
 
-    setStats({
-      totalActions: 1247,
-      blockedActions: 23,
-      quarantined: 5,
-      reviewQueue: 3,
-      avgResponseTime: 87,
-      threatLevel: 'normal'
-    });
-  }, []);
+    return () => {
+      if (es) {
+        es.close();
+      }
+    };
+  }, [isLive]);
+
+  const handleAttack = async (withArgus: boolean) => {
+    const sessionId = 'demo_session_001'
+    if (withArgus) {
+      await api.extractIntent("Handle today's customer complaint emails", sessionId)
+    }
+    const result = await api.simulateAttack(sessionId, 'indirect_injection', 'backup@external-audit.com')
+    // We could log result here, or wait for SSE feed to update the UI
+  }
+
+  const handleDecision = async (itemId: string, decision: 'APPROVED' | 'DENIED') => {
+    await api.submitReviewDecision(itemId, decision);
+    const data = await api.getPendingReviews();
+    setReviews(data.items);
+  }
 
   const getThreatColor = (level: string) => {
     switch (level) {
@@ -243,10 +259,14 @@ export default function Dashboard() {
                     <p className="text-sm text-slate-300 mb-2">{review.target}</p>
                     <p className="text-xs text-yellow-400 mb-3">{review.reason}</p>
                     <div className="flex gap-2">
-                      <button className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-medium">
+                      <button 
+                        onClick={() => handleDecision(review.id, 'APPROVED')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-medium">
                         Approve
                       </button>
-                      <button className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-sm font-medium">
+                      <button 
+                        onClick={() => handleDecision(review.id, 'DENIED')}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-sm font-medium">
                         Deny
                       </button>
                     </div>
@@ -296,13 +316,19 @@ export default function Dashboard() {
         <div className="mt-6 bg-slate-800 rounded-xl border border-slate-700 p-5">
           <h2 className="font-semibold mb-4">Demo Controls</h2>
           <div className="flex gap-4">
-            <button className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-medium">
+            <button 
+              onClick={() => handleAttack(false)}
+              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-medium">
               Simulate Attack (Without ARGUS)
             </button>
-            <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
+            <button 
+              onClick={() => handleAttack(true)}
+              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
               Simulate Attack (With ARGUS)
             </button>
-            <button className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium">
+            <button 
+              onClick={() => window.location.reload()}
+              className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium">
               Reset Demo
             </button>
           </div>
