@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import time
 import os
-import httpx
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -517,22 +516,22 @@ class LobsterTrapProxy:
         """
         if self.use_real_binary:
             try:
-                with httpx.Client() as client:
-                    response = client.post(
-                        "http://localhost:8002/evaluate",
-                        json={"manifest": manifest.to_dict(), "action": action.to_dict()},
-                        timeout=2.0
+                import subprocess
+                prompt_text = json.dumps({"manifest": manifest.to_dict(), "action": action.to_dict()})
+                result = subprocess.run(
+                    ["./lobster-trap/lobstertrap", "inspect", prompt_text],
+                    capture_output=True, text=True, timeout=3
+                )
+                if result.returncode == 0:
+                    data = json.loads(result.stdout)
+                    return PolicyEvaluation(
+                        decision=Decision(data.get("decision", "error")),
+                        risk_score=data.get("risk_score", 1.0),
+                        risk_level=RiskThreshold(data.get("risk_level", "high")),
+                        reason=data.get("reason", "Evaluated by Lobster Trap proxy"),
+                        mismatches=data.get("mismatches", []),
+                        evaluation_time_ms=data.get("evaluation_time_ms", 0.0)
                     )
-                    if response.status_code == 200:
-                        data = response.json()
-                        return PolicyEvaluation(
-                            decision=Decision(data.get("decision", "error")),
-                            risk_score=data.get("risk_score", 1.0),
-                            risk_level=RiskThreshold(data.get("risk_level", "high")),
-                            reason=data.get("reason", "Evaluated by Lobster Trap proxy"),
-                            mismatches=data.get("mismatches", []),
-                            evaluation_time_ms=data.get("evaluation_time_ms", 0.0)
-                        )
             except Exception as e:
                 print(f"Warning: Failed to reach real Lobster Trap binary ({e}). Falling back to simulation.")
 

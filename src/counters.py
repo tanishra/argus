@@ -2,10 +2,17 @@ from dataclasses import dataclass
 
 @dataclass
 class SystemCounters:
-    total_sessions: int = 156
-    actions_today: int = 1247
-    blocked_actions: int = 23
-    quarantined: int = 5
+    total_sessions: int = 0
+    actions_today: int = 0
+    blocked_actions: int = 0
+    quarantined: int = 0
+    total_response_time_ms: float = 0.0
+
+    @property
+    def avg_response_time_ms(self) -> float:
+        if self.actions_today == 0:
+            return 0.0
+        return self.total_response_time_ms / self.actions_today
 
 _counters = SystemCounters()
 
@@ -23,3 +30,6 @@ def increment_blocked():
 
 def increment_quarantined():
     _counters.quarantined += 1
+
+def add_response_time(ms: float):
+    _counters.total_response_time_ms += ms

@@ -5,6 +5,7 @@ from typing import Optional
 from .intent_engine.models import IntentManifest
 
 _redis_client: Optional[redis.Redis] = None
+_memory_fallback: dict[str, str] = {}
 
 async def get_redis() -> redis.Redis:
     global _redis_client
@@ -19,22 +20,35 @@ async def get_redis() -> redis.Redis:
 
 async def save_manifest(session_id: str, manifest: IntentManifest, ttl_seconds: int = 3600):
     """Save manifest to Redis with TTL."""
-    client = await get_redis()
-    await client.setex(
-        f"argus:session:{session_id}",
-        ttl_seconds,
-        json.dumps(manifest.to_dict())
-    )
+    try:
+        client = await get_redis()
+        await client.setex(
+            f"argus:session:{session_id}",
+            ttl_seconds,
+            json.dumps(manifest.to_dict())
+        )
+    except Exception:
+        # Fallback to in-memory dict
+        _memory_fallback[session_id] = json.dumps(manifest.to_dict())
 
 async def get_manifest(session_id: str) -> Optional[IntentManifest]:
     """Retrieve manifest from Redis."""
-    client = await get_redis()
-    data = await client.get(f"argus:session:{session_id}")
+    try:
+        client = await get_redis()
+        data = await client.get(f"argus:session:{session_id}")
+    except Exception:
+        # Fallback
+        data = _memory_fallback.get(session_id)
+        
     if data:
         return IntentManifest.from_dict(json.loads(data))
     return None
 
 async def delete_manifest(session_id: str):
     """Delete manifest from Redis."""
-    client = await get_redis()
-    await client.delete(f"argus:session:{session_id}")
+    try:
+        client = await get_redis()
+        await client.delete(f"argus:session:{session_id}")
+    except Exception:
+        if session_id in _memory_fallback:
+            del _memory_fallback[session_id]

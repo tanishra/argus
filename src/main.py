@@ -190,6 +190,7 @@ async def evaluate_action(request: ActionRequest):
 
     # Evaluate through Lobster Trap
     evaluation = _lobster_proxy.process_action(manifest, action)
+    counters.add_response_time(evaluation.evaluation_time_ms)
     
     if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
         counters.increment_blocked()
@@ -436,7 +437,7 @@ async def get_dashboard_stats():
         "blocked_actions": c.blocked_actions,
         "quarantined": c.quarantined,
         "review_queue_size": queue_stats["pending"],
-        "avg_response_time_ms": 87,
+        "avg_response_time_ms": round(c.avg_response_time_ms, 2),
         "threat_level": "high" if c.blocked_actions > 25 else "normal"
     }
 
@@ -472,21 +473,19 @@ async def export_compliance_report(session_id: str, format: str = "json"):
 
     Supports JSON, PDF, and CSV formats.
     """
+    # Fetch real session manifest
+    manifest = await session_store.get_manifest(session_id)
+    manifest_data = manifest.to_dict() if manifest else {"error": "session not found"}
+    
     # In production, this would generate actual reports
     report = {
         "session_id": session_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "intent_manifest": {
-            "declared_intent": "email_management",
-            "allowed_actions": ["read_email", "write_reply"],
-            "forbidden_actions": ["forward_email", "delete_email"],
-            "scope": "customer_complaints@inbox",
-            "risk_ceiling": 0.35
-        },
+        "intent_manifest": manifest_data,
         "actions_evaluated": 12,
         "actions_blocked": 2,
         "actions_quarantined": 1,
-        "review_items": _review_queue.get_pending()[:5],
+        "review_items": [item.to_dict() for item in _review_queue.get_pending()[:5]],
         "audit_log": []
     }
 
@@ -514,6 +513,3 @@ async def health_check():
             "review_queue": "operational"
         }
     }
-
-
-# ============ Run with: uvicorn src.main:app --reload ============
