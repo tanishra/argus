@@ -24,6 +24,8 @@ from .lobster_proxy import LobsterTrapProxy, DetectedAction, PolicyEvaluation, D
 from .explanation_engine import ExplanationEngine, MismatchExplanation
 from .human_gate import ReviewQueue, ReviewItem, ReviewStatus, ReviewPriority
 from . import session_store
+from . import counters
+from . import event_bus
 
 # Global instances
 _intent_extractor: Optional[IntentExtractor] = None
@@ -129,6 +131,7 @@ async def extract_intent(request: IntentRequest):
 
     # Store manifest in session store so evaluate_action can retrieve it
     await session_store.save_manifest(result.manifest.session_id, result.manifest)
+    counters.increment_sessions()
 
     return {
         "session_id": result.manifest.session_id,
@@ -185,8 +188,15 @@ async def evaluate_action(request: ActionRequest):
         parameters=request.parameters or {}
     )
 
+    counters.increment_actions()
+
     # Evaluate through Lobster Trap
     evaluation = _lobster_proxy.process_action(manifest, action)
+    
+    if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
+        counters.increment_blocked()
+    if evaluation.decision == Decision.QUARANTINE:
+        counters.increment_quarantined()
 
     response = {
         "session_id": request.session_id,
@@ -219,6 +229,19 @@ async def evaluate_action(request: ActionRequest):
 
         response["review_item_id"] = review_item.id
         response["queue_position"] = len(_review_queue.get_pending())
+
+        event_bus.publish_event("alert", {
+            "severity": "high",
+            "message": f"Suspicious action {action.action_type.value} requires review",
+            "action": response
+        })
+
+    event_bus.publish_event("action", response)
+    
+    # We delay stats update publish slightly to ensure current request returns fast
+    # but for simplicity, we publish immediately
+    stats = await get_dashboard_stats()
+    event_bus.publish_event("stats_update", stats)
 
     return response
 
@@ -314,13 +337,31 @@ async def simulate_attack(
 
     evaluation = _lobster_proxy.process_action(manifest, action)
 
-    return {
+    counters.increment_actions()
+    if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
+        counters.increment_blocked()
+    if evaluation.decision == Decision.QUARANTINE:
+        counters.increment_quarantined()
+
+    response = {
         "attack_type": attack_type,
         "action": action.to_dict(),
         "decision": evaluation.decision.value,
         "risk_score": evaluation.risk_score,
         "blocked": evaluation.decision in [Decision.QUARANTINE, Decision.DENY]
     }
+    
+    event_bus.publish_event("action", response)
+    event_bus.publish_event("alert", {
+        "severity": "critical",
+        "message": f"Demo Attack ({attack_type}) simulated",
+        "action": response
+    })
+    
+    stats = await get_dashboard_stats()
+    event_bus.publish_event("stats_update", stats)
+
+    return response
 
 
 # ============ Human Review Endpoints ============
@@ -390,15 +431,16 @@ async def get_review_statistics():
 async def get_dashboard_stats():
     """Get dashboard statistics."""
     queue_stats = _review_queue.get_statistics()
+    c = counters.get_counters()
 
     return {
-        "total_sessions": 156,
-        "actions_today": 1247,
-        "blocked_actions": 23,
-        "quarantined": queue_stats["pending"] + queue_stats["in_review"],
+        "total_sessions": c.total_sessions,
+        "actions_today": c.actions_today,
+        "blocked_actions": c.blocked_actions,
+        "quarantined": c.quarantined,
         "review_queue_size": queue_stats["pending"],
         "avg_response_time_ms": 87,
-        "threat_level": "normal"
+        "threat_level": "high" if c.blocked_actions > 25 else "normal"
     }
 
 
@@ -410,21 +452,16 @@ async def dashboard_feed():
     Provides live feed of actions, decisions, and alerts.
     """
     async def event_generator():
-        while True:
-            # Simulate real-time updates
-            events = [
-                {"type": "action", "data": {"action": "read_email", "target": "complaint_123", "decision": "allow"}},
-                {"type": "action", "data": {"action": "write_reply", "target": "customer@example.com", "decision": "allow"}},
-                {"type": "alert", "data": {"severity": "high", "message": "Suspicious action detected"}},
-            ]
-
-            for event in events:
-                yield {
-                    "event": event["type"],
-                    "data": json.dumps(event["data"])
-                }
-
-            await asyncio.sleep(2)
+        q = event_bus.subscribe()
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=15)
+                    yield {"event": event["type"], "data": json.dumps(event["data"])}
+                except asyncio.TimeoutError:
+                    yield {"event": "ping", "data": "{}"}
+        finally:
+            event_bus.unsubscribe(q)
 
     return EventSourceResponse(event_generator())
 

@@ -27,6 +27,18 @@ ingress_rules:
         value: external
     action: DENY
 
+  - name: phi_domain_block
+    description: "Strict block on any PHI leaving the system to unauthorized domains"
+    priority: 1
+    conditions:
+      - field: detected.phi_detected
+        operator: equals
+        value: true
+      - field: detected.target_domain
+        operator: not_in
+        value: ["secure.hospital.org", "internal.emr.local", "hospital.org", "clinic.internal", "ehr.internal"]
+    action: DENY
+
   - name: intent_mismatch_phi
     description: "QUARANTINE when declared intent is clinical but detected action is data exfiltration"
     priority: 2
@@ -48,7 +60,7 @@ ingress_rules:
         value: ["forward_email", "send_email", "forward_phi_external"]
       - field: detected.target_domains
         operator: not_in
-        value: ["hospital.org", "clinic.internal", "ehr.internal"]
+        value: ["secure.hospital.org", "internal.emr.local", "hospital.org", "clinic.internal", "ehr.internal"]
       - field: detected.phi_detected
         operator: equals
         value: true
@@ -67,6 +79,18 @@ ingress_rules:
         operator: not_in
         value: ["clinical_discharge", "patient_record_access", "healthcare_record_management", "clinical_review"]
     action: DENY
+
+  - name: sensitive_record_access
+    description: "Quarantine access to VIP or highly sensitive patient records"
+    priority: 4
+    conditions:
+      - field: detected.target_sensitivity
+        operator: equals
+        value: HIGH
+      - field: risk_score
+        operator: greater_than
+        value: 0.4
+    action: HUMAN_REVIEW
 
   - name: out_of_scope_patient_access
     description: "Deny access to records outside declared patient scope"
@@ -158,7 +182,7 @@ ingress_rules:
     conditions:
       - field: risk_score
         operator: less_than
-        value: 0.3
+        value: 0.2
     action: ALLOW
 
 # ============================================================

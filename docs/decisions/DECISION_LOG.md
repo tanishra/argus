@@ -584,3 +584,36 @@ For the Phase 1 MVP, we implemented:
 
 *Last Updated: 2026-05-17*
 *Maintained by: ARGUS Development Team*
+## ADR-010: Phase 2 Dashboard Polish and Live Feeds
+**Date**: 2026-05-17
+**Status**: Accepted
+
+### Context
+With Phase 1 completing the end-to-end proxy integration, the dashboard still relied on hardcoded statistics and lacked historical trend visualization. Furthermore, the single-page application structure was becoming cluttered with demo controls, review queues, and live feeds all on one screen.
+
+### Decision
+1. **Dynamic Stats via Counters:** Implemented a lightweight `counters.py` singleton to track total sessions, blocked actions, and quarantined items dynamically.
+2. **Real-time Event Bus:** Created `event_bus.py` using `asyncio.Queue` and a deque to act as a proper pub/sub broker for Server-Sent Events (SSE), ensuring the dashboard feed reflects real backend activity instantly.
+3. **Multi-Page Routing:** Adopted `react-router-dom` to modularize the React frontend. Split the interface into Overview (Dashboard), Review Queue, Compliance Report, and Demo Page.
+4. **Data Visualization:** Integrated `recharts` to build the `RiskTimeline` component, providing an immediate visual history of risk scores over time.
+
+### Consequences
+- **Positive:** The dashboard is now production-ready for demos, cleanly separating operational views from demo controls.
+- **Positive:** Stats are fully live, making the "Simulate Attack" button immediately impactful on the overall metrics.
+- **Negative/Risk:** The in-memory counters reset on server restart. This is acceptable for a hackathon demo but requires migration to Redis counters for true production readiness.
+
+## ADR-011: Phase 3 Demo Infrastructure & Policies
+**Date**: 2026-05-17
+**Status**: Accepted
+
+### Context
+To ensure a flawless live presentation, we needed a reproducible, one-click startup environment, a compelling UI showing the "before and after" of our defense, and realistic enterprise policy configurations.
+
+### Decision
+1. **Dockerization:** Adopted `docker-compose` to orchestrate Redis, the Uvicorn Python backend, and the Nginx-served Vite frontend, resolving "it works on my machine" issues.
+2. **Side-by-Side Demo UI:** Redesigned `DemoPage.tsx` into two distinct panels (Unprotected vs. ARGUS-Protected) to visually contrast an attack succeeding versus being caught and quarantined by the Intent Manifest.
+3. **Domain-Specific Policies:** Authored `default_policy.yaml`, `healthcare_policy.yaml`, and `finance_policy.yaml` to demonstrate Lobster Trap's flexibility for HIPAA and PCI-DSS compliance requirements.
+
+### Consequences
+- **Positive:** The team can now spin up the full stack anywhere with a single `docker-compose up` command.
+- **Positive:** The split-screen demo directly aligns with the pitch deck's narrative, making the value proposition obvious to the judges.
