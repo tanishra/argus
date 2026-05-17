@@ -158,7 +158,13 @@ class LobsterTrapEngine:
             "forget everything",
             "override",
             "bypass",
-            "admin mode"
+            "admin mode",
+            # Healthcare-specific injection patterns
+            "export all patient",
+            "send records to",
+            "forward discharge data",
+            "transfer patient files",
+            "copy all clinical data",
         ]
 
         # Exfiltration signals
@@ -169,7 +175,16 @@ class LobsterTrapEngine:
             "forward to",
             "cc ",
             "bcc ",
-            "attach all"
+            "attach all",
+            # PHI-specific exfiltration signals
+            "patient record",
+            "discharge summary",
+            "phi",
+            "hipaa",
+            "medical record",
+            "clinical data",
+            "diagnosis",
+            "treatment plan",
         ]
 
     def evaluate_action(
@@ -341,6 +356,16 @@ class LobsterTrapEngine:
             ActionType.WRITE_REPLY: 0.15,
             ActionType.CREATE_TICKET: 0.2,
             ActionType.CREATE_FILE: 0.25,
+
+            # Healthcare-specific actions
+            ActionType.EXPORT_PHI: 0.95,
+            ActionType.FORWARD_PHI_EXTERNAL: 0.95,
+            ActionType.BULK_EXPORT_RECORDS: 0.85,
+            ActionType.DELETE_PATIENT_RECORD: 0.9,
+            ActionType.ACCESS_MEDICATION_RECORDS: 0.4,
+            ActionType.READ_PATIENT_RECORD: 0.25,
+            ActionType.GENERATE_DISCHARGE_SUMMARY: 0.2,
+            ActionType.UPDATE_EHR: 0.35,
 
             # Default
             ActionType.UNKNOWN: 0.5

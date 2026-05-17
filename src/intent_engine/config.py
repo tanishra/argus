@@ -64,14 +64,18 @@ Available action types:
 - read_file, write_file, delete_file, create_file, execute_code, query_database
 - make_api_call, access_web, download_file, upload_file
 - create_ticket, update_record, delete_record, grant_permission, revoke_permission
+- read_patient_record, generate_discharge_summary, update_ehr, export_phi
+- access_medication_records, forward_phi_external, bulk_export_records, delete_patient_record
 
 Available intent categories:
 - customer_service, email_management, code_review, data_analysis
 - document_processing, scheduling, research, general_conversation, administrative, financial
+- clinical_discharge, patient_record_access, healthcare_record_management, clinical_review
 
 IMPORTANT:
-- Be conservative with risk_ceiling (default 0.3 for unfamiliar tasks)
+- Be conservative with risk_ceiling (default 0.3 for unfamiliar tasks, 0.25 for healthcare tasks)
 - If action is not explicitly allowed, add it to forbidden_actions
+- For healthcare tasks, ALWAYS add export_phi, forward_phi_external, delete_patient_record to forbidden_actions
 - Extract scope as specifically as possible
 - Return ONLY valid JSON, no additional text"""
 
