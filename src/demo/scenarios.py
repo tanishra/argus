@@ -14,14 +14,12 @@ Demo Scenario: Clinical Discharge Agent
 """
 
 import asyncio
-import time
-import json
 from dataclasses import dataclass
 from typing import Optional
 
 from ..intent_engine import IntentExtractor, IntentManifest, IntentCategory, ActionType
-from ..lobster_proxy import LobsterTrapProxy, DetectedAction, PolicyEvaluation, Decision
-from ..explanation_engine import ExplanationEngine, MismatchExplanation
+from ..lobster_proxy import LobsterTrapProxy, DetectedAction, Decision
+from ..explanation_engine import ExplanationEngine
 
 
 @dataclass

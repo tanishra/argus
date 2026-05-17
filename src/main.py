@@ -14,15 +14,15 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from .intent_engine import IntentExtractor, SyncIntentExtractor, IntentManifest, IntentExtractionResult, ActionType
-from .lobster_proxy import LobsterTrapProxy, DetectedAction, PolicyEvaluation, Decision
-from .explanation_engine import ExplanationEngine, MismatchExplanation
-from .human_gate import ReviewQueue, ReviewItem, ReviewStatus, ReviewPriority
+from .intent_engine import IntentExtractor, IntentManifest, ActionType
+from .lobster_proxy import LobsterTrapProxy, DetectedAction, Decision
+from .explanation_engine import ExplanationEngine
+from .human_gate import ReviewQueue
 from . import session_store
 from . import counters
 from . import event_bus
@@ -33,9 +33,7 @@ _explanation_engine: Optional[ExplanationEngine] = None
 _lobster_proxy: Optional[LobsterTrapProxy] = None
 _review_queue: Optional[ReviewQueue] = None
 
-# In-memory session store: session_id -> serialized IntentManifest dict
-# TODO: Replace with Redis in production (see implementation plan)
-# _session_store: dict[str, dict] = {} - Replaced by session_store
+
 
 
 # ============ Pydantic Models ============
@@ -399,7 +397,6 @@ async def claim_review(item_id: str, reviewer_id: str):
 async def submit_review_decision(decision: ReviewDecision):
     """Submit a review decision."""
     # Import ActionType for the completion
-    from .lobster_proxy.engine import ActionType
 
     item = _review_queue.complete_review(
         item_id=decision.item_id,

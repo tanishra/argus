@@ -11,7 +11,6 @@ comparing what the user said they wanted versus what the agent tries to do.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional

@@ -8,17 +8,14 @@ and high-risk actions that require human decision-making.
 
 from __future__ import annotations
 
-import json
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
 
-from ..intent_engine.models import IntentManifest
+from ..intent_engine.models import IntentManifest, ActionType
 from ..lobster_proxy.engine import DetectedAction, PolicyEvaluation, Decision
 
 

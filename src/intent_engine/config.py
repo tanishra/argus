@@ -8,7 +8,7 @@ Configuration management for the Intent Engine layer.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from pydantic import BaseModel, Field

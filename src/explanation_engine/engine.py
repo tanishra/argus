@@ -19,7 +19,7 @@ import httpx
 
 from .config import get_config, get_prompt_config, ExplanationEngineConfig
 from ..intent_engine.models import IntentManifest
-from ..lobster_proxy.engine import DetectedAction, PolicyEvaluation, Decision
+from ..lobster_proxy.engine import DetectedAction, PolicyEvaluation
 
 
 @dataclass
