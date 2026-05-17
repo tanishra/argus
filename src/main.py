@@ -196,6 +196,10 @@ async def evaluate_action(request: ActionRequest):
         counters.increment_blocked()
     if evaluation.decision == Decision.QUARANTINE:
         counters.increment_quarantined()
+    if evaluation.decision == Decision.ALLOW:
+        counters.increment_allowed()
+    if evaluation.decision == Decision.QUARANTINE:
+        counters.increment_human_reviews()
 
     response = {
         "session_id": request.session_id,
@@ -229,18 +233,18 @@ async def evaluate_action(request: ActionRequest):
         response["review_item_id"] = review_item.id
         response["queue_position"] = len(_review_queue.get_pending())
 
-        event_bus.publish_event("alert", {
+        await event_bus.publish_event("alert", {
             "severity": "high",
             "message": f"Suspicious action {action.action_type.value} requires review",
             "action": response
         })
 
-    event_bus.publish_event("action", response)
+    await event_bus.publish_event("action", response)
     
     # We delay stats update publish slightly to ensure current request returns fast
     # but for simplicity, we publish immediately
     stats = await get_dashboard_stats()
-    event_bus.publish_event("stats_update", stats)
+    await event_bus.publish_event("stats_update", stats)
 
     return response
 
@@ -337,6 +341,7 @@ async def simulate_attack(
     evaluation = _lobster_proxy.process_action(manifest, action)
 
     counters.increment_actions()
+    counters.increment_attack_type(attack_type)
     if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
         counters.increment_blocked()
     if evaluation.decision == Decision.QUARANTINE:
@@ -350,15 +355,15 @@ async def simulate_attack(
         "blocked": evaluation.decision in [Decision.QUARANTINE, Decision.DENY]
     }
     
-    event_bus.publish_event("action", response)
-    event_bus.publish_event("alert", {
+    await event_bus.publish_event("action", response)
+    await event_bus.publish_event("alert", {
         "severity": "critical",
         "message": f"Demo Attack ({attack_type}) simulated",
         "action": response
     })
     
     stats = await get_dashboard_stats()
-    event_bus.publish_event("stats_update", stats)
+    await event_bus.publish_event("stats_update", stats)
 
     return response
 
@@ -455,7 +460,7 @@ async def dashboard_feed():
             while True:
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=15)
-                    yield {"event": event["type"], "data": json.dumps(event["data"])}
+                    yield {"event": event["event_type"], "data": json.dumps(event["data"])}
                 except asyncio.TimeoutError:
                     yield {"event": "ping", "data": "{}"}
         finally:
@@ -513,3 +518,14 @@ async def health_check():
             "review_queue": "operational"
         }
     }
+
+
+# ============ Demo Reset Endpoint ============
+
+@app.post("/api/demo/reset")
+async def demo_reset(session_id: Optional[str] = None):
+    """Reset all counters and optionally clear a session manifest."""
+    counters.reset_counters()
+    if session_id:
+        await session_store.delete_manifest(session_id)
+    return {"status": "reset", "session_cleared": session_id is not None}
