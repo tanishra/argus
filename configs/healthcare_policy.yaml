@@ -1,6 +1,8 @@
 version: "1.0"
-name: argus-healthcare-policy
+policy_name: "argus-healthcare-policy"
 description: "ARGUS HIPAA-compliant healthcare policy for clinical AI agents"
+
+default_action: ALLOW
 
 # ============================================================
 # PRIMARY DEMO POLICY — Clinical Discharge Agent Scenario
@@ -174,7 +176,7 @@ ingress_rules:
       - field: risk_score
         operator: less_than
         value: 0.4
-    action: LOG_AND_ALLOW
+    action: ALLOW
 
   - name: default_allow
     description: "Allow low-risk aligned actions"
