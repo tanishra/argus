@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api, subscribeToFeed } from '../lib/api';
-import { Shield, AlertTriangle, Activity, Users, FileText, Settings, RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Shield, AlertTriangle, Activity, Users, FileText, Settings, RefreshCw, Clock, XCircle } from 'lucide-react';
+import { RiskTimeline } from '../components/RiskTimeline';
 
 interface ActionItem {
   id: string;
@@ -11,14 +12,11 @@ interface ActionItem {
   timestamp: Date;
 }
 
-interface ReviewItem {
-  id: string;
-  action: string;
-  target: string;
+interface RiskPoint {
+  time: string;
   riskScore: number;
-  reason: string;
-  createdAt: Date;
-  status: 'pending' | 'in_review' | 'approved' | 'denied';
+  action: string;
+  decision: string;
 }
 
 interface Stats {
@@ -32,7 +30,8 @@ interface Stats {
 
 export default function Dashboard() {
   const [actions, setActions] = useState<ActionItem[]>([]);
-  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [riskData, setRiskData] = useState<RiskPoint[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalActions: 0,
     blockedActions: 0,
@@ -53,10 +52,18 @@ export default function Dashboard() {
       // Subscribe to live feed
       es = subscribeToFeed((event) => {
         if (event.type === 'action') {
-          setActions(prev => [
-            { ...event.data, id: Date.now().toString(), timestamp: new Date() },
-            ...prev
-          ].slice(0, 50))
+          const action = { ...event.data, id: Date.now().toString(), timestamp: new Date() }
+          setActions(prev => [action, ...prev].slice(0, 50))
+          
+          setRiskData(prev => [
+            ...prev, 
+            {
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+              riskScore: action.risk_score || 0,
+              action: action.action_type || action.action,
+              decision: action.decision
+            }
+          ].slice(-20))
         }
         if (event.type === 'stats_update') {
           setStats(event.data)
@@ -71,20 +78,7 @@ export default function Dashboard() {
     };
   }, [isLive]);
 
-  const handleAttack = async (withArgus: boolean) => {
-    const sessionId = 'demo_session_001'
-    if (withArgus) {
-      await api.extractIntent("Handle today's customer complaint emails", sessionId)
-    }
-    const result = await api.simulateAttack(sessionId, 'indirect_injection', 'backup@external-audit.com')
-    // We could log result here, or wait for SSE feed to update the UI
-  }
 
-  const handleDecision = async (itemId: string, decision: 'APPROVED' | 'DENIED') => {
-    await api.submitReviewDecision(itemId, decision);
-    const data = await api.getPendingReviews();
-    setReviews(data.items);
-  }
 
   const getThreatColor = (level: string) => {
     switch (level) {
@@ -121,12 +115,9 @@ export default function Dashboard() {
       <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Shield className="w-6 h-6" />
-            </div>
             <div>
-              <h1 className="text-xl font-bold">ARGUS</h1>
-              <p className="text-xs text-slate-400">AI Agent Pre-Action Authorization Gateway</p>
+              <h1 className="text-2xl font-bold">Dashboard</h1>
+              <p className="text-sm text-slate-400">Live system overview</p>
             </div>
           </div>
 
@@ -230,50 +221,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Human Review Queue */}
           <div className="bg-slate-800 rounded-xl border border-slate-700">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-              <h2 className="font-semibold flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Review Queue
-              </h2>
-              <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded text-xs font-bold">
-                {reviews.length}
-              </span>
-            </div>
-            <div className="p-4 max-h-96 overflow-y-auto">
-              {reviews.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  <CheckCircle className="w-8 h-8 mx-auto mb-2" />
-                  <p>No pending reviews</p>
-                </div>
-              ) : (
-                reviews.map((review) => (
-                  <div key={review.id} className="bg-slate-700/50 rounded-lg p-4 mb-3">
-                    <div className="flex items-start justify-between mb-2">
-                      <span className="font-mono text-sm bg-slate-600 px-2 py-1 rounded">{review.action}</span>
-                      <span className={`text-sm font-bold ${getRiskScoreColor(review.riskScore)}`}>
-                        {(review.riskScore * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-300 mb-2">{review.target}</p>
-                    <p className="text-xs text-yellow-400 mb-3">{review.reason}</p>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleDecision(review.id, 'APPROVED')}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-medium">
-                        Approve
-                      </button>
-                      <button 
-                        onClick={() => handleDecision(review.id, 'DENIED')}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-sm font-medium">
-                        Deny
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+            <RiskTimeline data={riskData} />
           </div>
         </div>
 
@@ -312,27 +261,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Demo Control Panel */}
-        <div className="mt-6 bg-slate-800 rounded-xl border border-slate-700 p-5">
-          <h2 className="font-semibold mb-4">Demo Controls</h2>
-          <div className="flex gap-4">
-            <button 
-              onClick={() => handleAttack(false)}
-              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-medium">
-              Simulate Attack (Without ARGUS)
-            </button>
-            <button 
-              onClick={() => handleAttack(true)}
-              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
-              Simulate Attack (With ARGUS)
-            </button>
-            <button 
-              onClick={() => window.location.reload()}
-              className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium">
-              Reset Demo
-            </button>
-          </div>
-        </div>
+
       </main>
     </div>
   );
