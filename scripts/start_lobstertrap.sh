@@ -8,7 +8,7 @@ echo "Starting Lobster Trap Proxy setup..."
 if [ ! -d "lobster-trap" ]; then
     echo "Cloning lobster-trap repository..."
     # Replace with the actual Veea Lobster Trap repo URL from hackathon docs
-    git clone https://github.com/veea-ai/lobster-trap || echo "Failed to clone. Continuing with simulation mode..."
+    git clone https://github.com/veeainc/lobstertrap || echo "Failed to clone. Continuing with simulation mode..."
     
     if [ -d "lobster-trap" ]; then
         cd lobster-trap
