@@ -535,6 +535,35 @@ Building ARGUS first:
 - ARGUS success required before AgentGuardian can launch
 - Different sales motions for different buyers
 
+## ADR-009: Phase 1 End-to-End Implementation
+
+**Status:** ACCEPTED
+**Date:** 2026-05-17
+**Context:** We needed to transition from the initial stubbed backend to a fully integrated Phase 1 MVP.
+
+### Decision
+
+For the Phase 1 MVP, we implemented:
+1. **Redis Session Store:** Transitioned from an in-memory dictionary to `redis[asyncio]` for persistent intent manifests.
+2. **Real Lobster Trap Integration:** Created YAML policies and an environment toggle (`USE_LOBSTER_TRAP_BINARY`) to proxy directly to the real Veea binary or fall back to simulation.
+3. **React Real-Time API:** Replaced hardcoded frontend mock data with Server-Sent Events (SSE) subscriptions linked to the FastAPI backend.
+
+### Rationale
+
+- **Redis**: Essential for FastAPI async performance, handling TTLs for stale sessions automatically.
+- **Lobster Trap Toggle**: Provides a bulletproof demo experience; if the actual binary fails to run during the presentation, the Python simulation seamlessly takes over.
+- **SSE**: Sub-millisecond latency for dashboard updates without the heavy overhead of configuring full WebSockets for a one-way event feed.
+
+### Consequences
+
+**Positive:**
+- Complete end-to-end data flow established.
+- Demo-safe failure modes (graceful degradation).
+- True real-time reactivity in the frontend dashboard.
+
+**Negative:**
+- Adds Redis as a hard runtime dependency.
+
 ---
 
 ## Decision Log Summary
@@ -549,8 +578,9 @@ Building ARGUS first:
 | ADR-006 | Error Handling | Fail-secure (quarantine) | Maximum safety; builds trust |
 | ADR-007 | Compliance | Automated PDF export | Enterprise buyer requirement; premium pricing |
 | ADR-008 | Evolution | ARGUS → AgentGuardian | Data flywheel; full-stack solution |
+| ADR-009 | Phase 1 Implementation | Redis + SSE + Proxy Toggle | Persistent sessions; real-time dashboard; demo safety |
 
 ---
 
-*Last Updated: 2026-05-16*
+*Last Updated: 2026-05-17*
 *Maintained by: ARGUS Development Team*

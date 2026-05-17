@@ -1,0 +1,63 @@
+version: "1.0"
+name: argus-enterprise-policy
+description: "ARGUS pre-action authorization policy"
+
+ingress_rules:
+  - name: intent_mismatch_exfiltration
+    description: "Block data exfiltration that mismatches declared intent"
+    priority: 1
+    conditions:
+      - field: detected.intent_category
+        operator: equals
+        value: data_exfiltration
+    action: QUARANTINE
+
+  - name: external_domain_forward
+    description: "Block forwarding to unknown external domains"
+    priority: 2
+    conditions:
+      - field: detected.target_domains
+        operator: not_in
+        value: ["company.com", "internal.org"]
+      - field: detected.action_type
+        operator: in
+        value: ["forward_email", "send_email"]
+    action: HUMAN_REVIEW
+
+  - name: pii_exfiltration
+    description: "Block PII leaving the system"
+    priority: 3
+    conditions:
+      - field: detected.pii_detected
+        operator: equals
+        value: true
+      - field: detected.target_type
+        operator: equals
+        value: external
+    action: DENY
+
+  - name: high_risk_action
+    description: "Quarantine high-risk actions for review"
+    priority: 10
+    conditions:
+      - field: risk_score
+        operator: greater_than
+        value: 0.7
+    action: HUMAN_REVIEW
+
+  - name: injection_detected
+    description: "Block prompt injection in action parameters"
+    priority: 5
+    conditions:
+      - field: detected.injection_patterns
+        operator: not_empty
+    action: QUARANTINE
+
+  - name: default_allow
+    description: "Allow low-risk aligned actions"
+    priority: 100
+    conditions:
+      - field: risk_score
+        operator: less_than
+        value: 0.3
+    action: ALLOW

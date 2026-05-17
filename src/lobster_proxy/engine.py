@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import json
 import time
+import os
+import httpx
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
-
-from pydantic import BaseModel, Field
 
 from ..intent_engine.models import IntentManifest, ActionType
 
@@ -478,6 +478,7 @@ class LobsterTrapProxy:
     def __init__(self):
         self.engine = LobsterTrapEngine()
         self._policy_cache: dict[str, dict] = {}
+        self.use_real_binary = os.getenv("USE_LOBSTER_TRAP_BINARY", "false").lower() == "true"
 
     def process_action(
         self,
@@ -489,6 +490,27 @@ class LobsterTrapProxy:
 
         This is the main entry point from the FastAPI backend.
         """
+        if self.use_real_binary:
+            try:
+                with httpx.Client() as client:
+                    response = client.post(
+                        "http://localhost:8002/evaluate",
+                        json={"manifest": manifest.to_dict(), "action": action.to_dict()},
+                        timeout=2.0
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        return PolicyEvaluation(
+                            decision=Decision(data.get("decision", "error")),
+                            risk_score=data.get("risk_score", 1.0),
+                            risk_level=RiskThreshold(data.get("risk_level", "high")),
+                            reason=data.get("reason", "Evaluated by Lobster Trap proxy"),
+                            mismatches=data.get("mismatches", []),
+                            evaluation_time_ms=data.get("evaluation_time_ms", 0.0)
+                        )
+            except Exception as e:
+                print(f"Warning: Failed to reach real Lobster Trap binary ({e}). Falling back to simulation.")
+
         return self.engine.evaluate_action(manifest, action)
 
     def create_detected_action(

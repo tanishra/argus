@@ -19,10 +19,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from .intent_engine import IntentExtractor, SyncIntentExtractor, IntentManifest, IntentExtractionResult
-from .lobster_proxy import LobsterTrapProxy, DetectedAction, PolicyEvaluation, Decision, ActionType
+from .intent_engine import IntentExtractor, SyncIntentExtractor, IntentManifest, IntentExtractionResult, ActionType
+from .lobster_proxy import LobsterTrapProxy, DetectedAction, PolicyEvaluation, Decision
 from .explanation_engine import ExplanationEngine, MismatchExplanation
 from .human_gate import ReviewQueue, ReviewItem, ReviewStatus, ReviewPriority
+from . import session_store
 
 # Global instances
 _intent_extractor: Optional[IntentExtractor] = None
@@ -32,7 +33,7 @@ _review_queue: Optional[ReviewQueue] = None
 
 # In-memory session store: session_id -> serialized IntentManifest dict
 # TODO: Replace with Redis in production (see implementation plan)
-_session_store: dict[str, dict] = {}
+# _session_store: dict[str, dict] = {} - Replaced by session_store
 
 
 # ============ Pydantic Models ============
@@ -127,7 +128,7 @@ async def extract_intent(request: IntentRequest):
     )
 
     # Store manifest in session store so evaluate_action can retrieve it
-    _session_store[result.manifest.session_id] = result.manifest.to_dict()
+    await session_store.save_manifest(result.manifest.session_id, result.manifest)
 
     return {
         "session_id": result.manifest.session_id,
@@ -146,13 +147,13 @@ async def get_manifest(session_id: str):
 
     Used by the dashboard to display current authorization boundaries.
     """
-    manifest_data = _session_store.get(session_id)
-    if not manifest_data:
+    manifest = await session_store.get_manifest(session_id)
+    if not manifest:
         raise HTTPException(
             status_code=404,
             detail=f"Session '{session_id}' not found. Call POST /api/intent/extract first."
         )
-    return manifest_data
+    return manifest.to_dict()
 
 
 # ============ Policy Enforcement Endpoints ============
@@ -169,13 +170,12 @@ async def evaluate_action(request: ActionRequest):
     4. Returns the decision and, if quarantined, adds to review queue
     """
     # Get manifest for session from store
-    manifest_data = _session_store.get(request.session_id)
-    if not manifest_data:
+    manifest = await session_store.get_manifest(request.session_id)
+    if not manifest:
         raise HTTPException(
             status_code=404,
             detail=f"Session '{request.session_id}' not found. Call POST /api/intent/extract first."
         )
-    manifest = IntentManifest.from_dict(manifest_data)
 
     # Create detected action
     action = DetectedAction(
@@ -235,10 +235,8 @@ async def simulate_attack(
     Used in the demo scenario to show ARGUS catching an attack.
     """
     # Get manifest for session from store, or use a default demo manifest
-    manifest_data = _session_store.get(session_id)
-    if manifest_data:
-        manifest = IntentManifest.from_dict(manifest_data)
-    else:
+    manifest = await session_store.get_manifest(session_id)
+    if not manifest:
         # Default demo manifest for simulation without prior intent extraction
         manifest = IntentManifest(
             declared_intent="email_management",
