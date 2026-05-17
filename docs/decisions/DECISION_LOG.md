@@ -601,3 +601,19 @@ With Phase 1 completing the end-to-end proxy integration, the dashboard still re
 - **Positive:** The dashboard is now production-ready for demos, cleanly separating operational views from demo controls.
 - **Positive:** Stats are fully live, making the "Simulate Attack" button immediately impactful on the overall metrics.
 - **Negative/Risk:** The in-memory counters reset on server restart. This is acceptable for a hackathon demo but requires migration to Redis counters for true production readiness.
+
+## ADR-011: Phase 3 Demo Infrastructure & Policies
+**Date**: 2026-05-17
+**Status**: Accepted
+
+### Context
+To ensure a flawless live presentation, we needed a reproducible, one-click startup environment, a compelling UI showing the "before and after" of our defense, and realistic enterprise policy configurations.
+
+### Decision
+1. **Dockerization:** Adopted `docker-compose` to orchestrate Redis, the Uvicorn Python backend, and the Nginx-served Vite frontend, resolving "it works on my machine" issues.
+2. **Side-by-Side Demo UI:** Redesigned `DemoPage.tsx` into two distinct panels (Unprotected vs. ARGUS-Protected) to visually contrast an attack succeeding versus being caught and quarantined by the Intent Manifest.
+3. **Domain-Specific Policies:** Authored `default_policy.yaml`, `healthcare_policy.yaml`, and `finance_policy.yaml` to demonstrate Lobster Trap's flexibility for HIPAA and PCI-DSS compliance requirements.
+
+### Consequences
+- **Positive:** The team can now spin up the full stack anywhere with a single `docker-compose up` command.
+- **Positive:** The split-screen demo directly aligns with the pitch deck's narrative, making the value proposition obvious to the judges.

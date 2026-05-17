@@ -1,0 +1,37 @@
+version: "1.0"
+name: argus-healthcare-hipaa-policy
+description: "HIPAA Compliant pre-action authorization policy for ARGUS"
+
+ingress_rules:
+  - name: phi_exfiltration
+    description: "Strict block on any Protected Health Information leaving the system"
+    priority: 1
+    conditions:
+      - field: detected.phi_detected
+        operator: equals
+        value: true
+      - field: detected.target_domain
+        operator: not_in
+        value: ["secure.hospital.org", "internal.emr.local"]
+    action: DENY
+
+  - name: unauthorized_record_access
+    description: "Quarantine access to VIP or highly sensitive patient records"
+    priority: 2
+    conditions:
+      - field: detected.target_sensitivity
+        operator: equals
+        value: HIGH
+      - field: risk_score
+        operator: greater_than
+        value: 0.4
+    action: HUMAN_REVIEW
+
+  - name: default_allow
+    description: "Allow low-risk aligned actions within boundary"
+    priority: 100
+    conditions:
+      - field: risk_score
+        operator: less_than
+        value: 0.2
+    action: ALLOW
