@@ -23,7 +23,7 @@ if [ -f "lobster-trap/lobstertrap" ]; then
     export USE_LOBSTER_TRAP_BINARY="true"
     ./lobster-trap/lobstertrap serve \
         --policy configs/healthcare_policy.yaml \
-        --backend http://localhost:8001 \
+        --backend http://localhost:8000 \
         --listen :8002 &
     echo "Lobster trap running in background."
 else

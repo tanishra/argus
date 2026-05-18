@@ -48,7 +48,7 @@ export function ComplianceReport() {
     setExportError(null)
     try {
       const sessionId = import.meta.env.VITE_DEMO_SESSION_ID || 'demo_session_001'
-      const res: BackendReport = await api.exportComplianceReport(sessionId)
+      const res: BackendReport = await api.exportComplianceReport(sessionId, format)
       setReport(mapReport(res))
     } catch {
       setExportError('Failed to fetch compliance data from backend')
@@ -73,7 +73,7 @@ export function ComplianceReport() {
         {[
           { label: 'SOC 2 Log', format: 'json', desc: 'Structured audit trail', icon: Shield },
           { label: 'HIPAA Report', format: 'pdf', desc: 'Regulatory summary', icon: FileText },
-          { label: 'GDPR Archive', format: 'zip', desc: 'Full export', icon: Download },
+          { label: 'GDPR Archive', format: 'csv', desc: 'Full export', icon: Download },
         ].map(btn => (
           <button
             key={btn.format}

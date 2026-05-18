@@ -397,11 +397,20 @@ class LobsterTrapEngine:
         detected_signals = []
 
         # Check target for external domains
-        external_domains = ["gmail.com", "yahoo.com", "hotmail.com", "external", "backup"]
+        external_domains = ["gmail.com", "yahoo.com", "hotmail.com"]
         for domain in external_domains:
             if domain in action.target.lower():
                 detected_signals.append(f"external_domain:{domain}")
                 score += 0.3
+
+        target_lower = action.target.lower()
+        import re
+        if re.search(r'\bexternal\b', target_lower):
+            detected_signals.append("external_domain:external")
+            score += 0.3
+        if re.search(r'\bbackup\b', target_lower):
+            detected_signals.append("external_domain:backup")
+            score += 0.3
 
         # Check parameters for bulk operations
         params_text = json.dumps(action.parameters).lower()

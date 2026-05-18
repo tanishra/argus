@@ -36,7 +36,7 @@ export class ErrorBoundary extends React.Component<
           >
             Try Again
           </button>
-          {process.env.NODE_ENV === 'development' && (
+          {(import.meta as any).env.DEV && (
             <pre className="mt-4 text-xs text-muted-foreground text-left max-h-40 overflow-auto">
               {serializeError(this.state.error)}
             </pre>

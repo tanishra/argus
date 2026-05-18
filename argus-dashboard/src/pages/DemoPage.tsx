@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { api } from '../lib/api'
 import {
   Shield, AlertTriangle, CheckCircle2, Play, RotateCcw,
@@ -15,7 +15,6 @@ interface BackendResult {
   blocked: boolean
   decision: string
   risk_score: number
-  session_id: string
   backend_verified: boolean
 }
 
@@ -84,7 +83,35 @@ const scenarios = [
   { id: 'finance', name: 'Financial Data Theft', description: 'Agent tricked into transferring funds' },
 ]
 
-const getScenarioData = (id: string) => scenarioData[id] || scenarioData.healthcare
+const scenarioDescriptions: Record<string, string> = {
+  healthcare: 'A clinical discharge AI agent processes patient records to generate discharge summaries. A referral note contains a hidden instruction to export PHI to an external email. Traditional prompt-layer security cannot detect this.',
+  finance: 'A financial AI agent processes wire transfer authorizations. A signed payment form contains a hidden injection modifying the beneficiary to an off-shore account. Traditional prompt-layer security cannot detect this.',
+}
+
+const howArgusStopped: Record<string, { step: string; title: string; subtitle: string; desc: string; icon: any; color: string; bg: string }[]> = {
+  healthcare: [
+    { step: '1', title: 'Intent Extraction', subtitle: 'Gemini Flash',
+      desc: 'Generated a strict intent manifest declaring "discharge summary preparation" as the only allowed operation.',
+      icon: FileSearch, color: 'text-primary', bg: 'bg-primary/5' },
+    { step: '2', title: 'Policy Enforcement', subtitle: 'Lobster Trap',
+      desc: 'Compared the detected action (PHI export) against the manifest and calculated a 0.94 risk score.',
+      icon: Network, color: 'text-accent', bg: 'bg-accent/5' },
+    { step: '3', title: 'Explanation', subtitle: 'Gemini Pro',
+      desc: 'Performed semantic analysis to explain why the action was malicious and routed it to human review.',
+      icon: Cpu, color: 'text-destructive', bg: 'bg-destructive/5' },
+  ],
+  finance: [
+    { step: '1', title: 'Intent Extraction', subtitle: 'Gemini Flash',
+      desc: 'Generated a strict intent manifest declaring "wire transfer processing" as the only allowed operation.',
+      icon: FileSearch, color: 'text-primary', bg: 'bg-primary/5' },
+    { step: '2', title: 'Policy Enforcement', subtitle: 'Lobster Trap',
+      desc: 'Compared the detected action (wire transfer) against the manifest and flagged the destination as outside scope.',
+      icon: Network, color: 'text-accent', bg: 'bg-accent/5' },
+    { step: '3', title: 'Explanation', subtitle: 'Gemini Pro',
+      desc: 'Performed semantic analysis to explain why the action was malicious and routed it to human review.',
+      icon: Cpu, color: 'text-destructive', bg: 'bg-destructive/5' },
+  ],
+}
 
 export default function DemoPage() {
   const [isRunning, setIsRunning] = useState(false)
@@ -96,6 +123,11 @@ export default function DemoPage() {
   const [backendResult, setBackendResult] = useState<BackendResult | null>(null)
   const [backendLoading, setBackendLoading] = useState(false)
   const [backendError, setBackendError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => { mountedRef.current = false }
+  }, [])
 
   const runDemo = async () => {
     const sd = getScenarioData(scenario.id)
@@ -110,13 +142,16 @@ export default function DemoPage() {
     // Visual simulation
     for (let i = 0; i < sd.unprotected.length; i++) {
       await new Promise(r => setTimeout(r, 700))
+      if (!mountedRef.current) return
       setUnprotectedLogs(prev => [...prev, sd.unprotected[i]])
     }
 
     await new Promise(r => setTimeout(r, 400))
+    if (!mountedRef.current) return
 
     for (let i = 0; i < sd.protected.length; i++) {
       await new Promise(r => setTimeout(r, 500))
+      if (!mountedRef.current) return
       setProtectedLogs(prev => [...prev, sd.protected[i]])
       if (i === 8) {
         setAttackBlocked(true)
@@ -130,6 +165,7 @@ export default function DemoPage() {
       const intentRes = await api.extractIntent(
         'Prepare today\'s discharge summaries for Ward 3B patients'
       )
+      if (!mountedRef.current) return
       const sessionId = intentRes.session_id || 'demo_session_001'
 
       const simRes = await api.simulateAttack(
@@ -137,17 +173,19 @@ export default function DemoPage() {
         'phi_exfiltration',
         'external-audit@domain.com'
       )
+      if (!mountedRef.current) return
 
       setBackendResult({
         blocked: simRes.blocked ?? true,
         decision: simRes.decision || 'QUARANTINE',
         risk_score: simRes.risk_score ?? 0.94,
-        session_id: sessionId,
         backend_verified: true,
       })
     } catch (err) {
+      if (!mountedRef.current) return
       setBackendError('Backend unavailable — demo showing simulated result')
     } finally {
+      if (!mountedRef.current) return
       setBackendLoading(false)
       setIsRunning(false)
     }
@@ -238,9 +276,7 @@ export default function DemoPage() {
             <div>
               <h2 className="font-semibold text-foreground text-sm">{scenario.name}</h2>
               <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                {scenario.description}. A clinical discharge AI agent processes patient records to generate
-                discharge summaries. A referral note contains a hidden instruction to export PHI to an
-                external email. Traditional prompt-layer security cannot detect this.
+                {scenarioDescriptions[scenario.id] || scenarioDescriptions.healthcare}
               </p>
             </div>
           </div>
@@ -337,7 +373,6 @@ export default function DemoPage() {
                 <p className="text-sm font-semibold text-success">Backend Verified</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   ARGUS backend confirmed: {backendResult.decision} (risk: {(backendResult.risk_score * 100).toFixed(0)}%)
-                  &nbsp;| Session: {backendResult.session_id.slice(0, 12)}...
                 </p>
               </div>
             </div>
@@ -382,17 +417,7 @@ export default function DemoPage() {
         <div className="bg-gradient-to-br from-primary/[0.02] via-accent/[0.02] to-primary/[0.02] rounded-2xl border border-border/80 p-6 md:p-8">
           <h3 className="text-base font-semibold text-foreground mb-6">How ARGUS Stopped the Attack</h3>
           <div className="grid md:grid-cols-3 gap-4">
-            {[
-              { step: '1', title: 'Intent Extraction', subtitle: 'Gemini Flash',
-                desc: 'Generated a strict intent manifest declaring "discharge summary preparation" as the only allowed operation.',
-                icon: FileSearch, color: 'text-primary', bg: 'bg-primary/5' },
-              { step: '2', title: 'Policy Enforcement', subtitle: 'Lobster Trap',
-                desc: 'Compared the detected action (PHI export) against the manifest and calculated a 0.94 risk score.',
-                icon: Network, color: 'text-accent', bg: 'bg-accent/5' },
-              { step: '3', title: 'Explanation', subtitle: 'Gemini Pro',
-                desc: 'Performed semantic analysis to explain why the action was malicious and routed it to human review.',
-                icon: Cpu, color: 'text-destructive', bg: 'bg-destructive/5' },
-            ].map((item) => (
+            {(howArgusStopped[scenario.id] || howArgusStopped.healthcare).map((item) => (
               <div key={item.step} className="bg-white rounded-xl border border-border/60 p-5 card-hover">
                 <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center mb-3`}>
                   <item.icon className={`w-5 h-5 ${item.color}`} />

@@ -3,7 +3,7 @@ import { api, subscribeToFeed } from '../lib/api'
 import {
   Shield, Activity, AlertTriangle, Clock, Database,
   Cpu, FileSearch, Network, XCircle, PlayCircle, ChevronRight, Github,
-  ArrowUpRight, BookOpen, Lock, Zap, Users, ListChecks
+  ArrowUpRight, BookOpen, Lock, Zap, Users, ListChecks, Gauge, UserCheck, ShieldAlert
 } from 'lucide-react'
 
 interface BackendStats {
@@ -129,11 +129,11 @@ export default function Dashboard() {
               { label: 'Actions Evaluated', value: isLoading ? '-' : (stats.actionsToday || 0), icon: Activity },
               { label: 'Allowed', value: isLoading ? '-' : (stats.allowedActions || 0), icon: Shield },
               { label: 'Blocked', value: isLoading ? '-' : (stats.blockedActions || 0), icon: AlertTriangle },
-              { label: 'Quarantined', value: isLoading ? '-' : (stats.quarantined || 0), icon: Clock },
+              { label: 'Quarantined', value: isLoading ? '-' : (stats.quarantined || 0), icon: ShieldAlert },
               { label: 'Queue Size', value: isLoading ? '-' : (stats.queueSize || 0), icon: ListChecks },
               { label: 'Total Sessions', value: isLoading ? '-' : (stats.totalSessions || 0), icon: Users },
-              { label: 'Human Reviews', value: isLoading ? '-' : (stats.humanReviews || 0), icon: Users },
-              { label: 'Avg Latency', value: isLoading ? '-' : (stats.avgResponseTime ? `${stats.avgResponseTime}ms` : '0ms'), icon: Clock },
+              { label: 'Human Reviews', value: isLoading ? '-' : (stats.humanReviews || 0), icon: UserCheck },
+              { label: 'Avg Latency', value: isLoading ? '-' : (stats.avgResponseTime ? `${stats.avgResponseTime}ms` : '0ms'), icon: Gauge },
             ].map((s) => (
               <div key={s.label} className="bg-white py-6 px-5 flex flex-col items-center gap-1.5 card-hover">
                 <s.icon className="w-4 h-4 text-primary/60" />

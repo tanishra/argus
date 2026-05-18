@@ -238,6 +238,9 @@ class ReviewQueue:
         if evaluation.decision == Decision.DENY:
             return ReviewPriority.CRITICAL
 
+        if evaluation.decision == Decision.QUARANTINE:
+            return ReviewPriority.HIGH
+
         if evaluation.risk_score >= 0.9:
             return ReviewPriority.URGENT
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Shield, AlertTriangle, CheckCircle2, XCircle, Clock, Search,
   ChevronRight, ArrowUpDown, Filter
@@ -63,20 +63,24 @@ export default function ReviewQueue() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [submittingItems, setSubmittingItems] = useState<Set<string>>(new Set())
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     fetchReviewQueue()
+    return () => { mountedRef.current = false }
   }, [])
 
   const fetchReviewQueue = async () => {
     try {
       setIsLoading(true)
-      const data: any = await api.getPendingReviews()
-      const raw: BackendReviewItem[] = data.items || []
-      setItems(raw.map(mapReviewItem))
+      const data: { items: BackendReviewItem[] } = await api.getPendingReviews()
+      if (!mountedRef.current) return
+      setItems(data.items.map(mapReviewItem))
     } catch {
+      if (!mountedRef.current) return
       setItems([])
     } finally {
+      if (!mountedRef.current) return
       setIsLoading(false)
     }
   }

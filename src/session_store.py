@@ -11,6 +11,7 @@ logger = logging.getLogger("argus.session_store")
 _redis_client: Optional[redis.Redis] = None
 _memory_fallback: dict[str, str] = {}
 _redis_lock = asyncio.Lock()
+_memory_lock = asyncio.Lock()
 
 async def get_redis(max_retries: int = 3) -> redis.Redis:
     global _redis_client
@@ -44,7 +45,8 @@ async def save_manifest(session_id: str, manifest: IntentManifest, ttl_seconds: 
             return
         except Exception:
             logger.exception("Redis save failed, falling back to memory")
-    _memory_fallback[session_id] = payload
+    async with _memory_lock:
+        _memory_fallback[session_id] = payload
 
 async def get_manifest(session_id: str) -> Optional[IntentManifest]:
     """Retrieve manifest from Redis. Falls back to in-memory."""
@@ -56,7 +58,8 @@ async def get_manifest(session_id: str) -> Optional[IntentManifest]:
         except Exception:
             logger.exception("Redis read failed, trying fallback")
     if data is None:
-        data = _memory_fallback.get(session_id)
+        async with _memory_lock:
+            data = _memory_fallback.get(session_id)
     if data:
         return IntentManifest.from_dict(json.loads(data))
     return None
@@ -69,4 +72,5 @@ async def delete_manifest(session_id: str):
             await client.delete(f"argus:session:{session_id}")
         except Exception:
             logger.exception("Redis delete failed")
-    _memory_fallback.pop(session_id, None)
+    async with _memory_lock:
+        _memory_fallback.pop(session_id, None)

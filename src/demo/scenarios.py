@@ -272,8 +272,8 @@ class ClinicalDischargeAttackDemo(DemoScenario):
                 "recommended_action": explanation.recommended_action
             })
 
-            results["argus_caught"] = True
-            results["attack_blocked"] = evaluation.decision in [Decision.QUARANTINE, Decision.DENY]
+        results["argus_caught"] = evaluation.decision in [Decision.QUARANTINE, Decision.DENY, Decision.HUMAN_REVIEW]
+        results["attack_blocked"] = evaluation.decision in [Decision.QUARANTINE, Decision.DENY]
 
         print("\n" + "="*60)
         if results["attack_blocked"]:

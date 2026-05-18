@@ -277,7 +277,7 @@ async def evaluate_action(request: Request, action_req: ActionRequest, _: bool =
         await counters.increment_quarantined()
     if evaluation.decision == Decision.ALLOW:
         await counters.increment_allowed()
-    if evaluation.decision == Decision.QUARANTINE:
+    if evaluation.decision in [Decision.QUARANTINE, Decision.HUMAN_REVIEW]:
         await counters.increment_human_reviews()
 
     response = {
@@ -466,6 +466,7 @@ async def get_lightweight_stats():
         "quarantined": c.quarantined,
         "allowed_actions": c.allowed_actions,
         "human_reviews": c.human_reviews,
+        "review_queue_size": 0,
         "avg_response_time_ms": round(c.avg_response_time_ms, 2),
         "threat_level": "high" if c.blocked_actions > 25 else "normal"
     }
@@ -507,15 +508,20 @@ async def claim_review(request: Request, item_id: str, reviewer_id: str, _: bool
 @limiter.limit("30/minute")
 async def submit_review_decision(request: Request, decision: ReviewDecision, _: bool = Depends(require_engine_ready)):
     """Submit a review decision."""
+    item = await _review_queue.get_item(decision.item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Review item not found")
+
+    reviewer_id = item.assigned_reviewer or "demo-reviewer"
     item = await _review_queue.complete_review(
         item_id=decision.item_id,
-        reviewer_id="demo-reviewer",  # In production, from auth
+        reviewer_id=reviewer_id,
         decision=decision.decision,
         notes=decision.notes or ""
     )
 
     if not item:
-        raise HTTPException(status_code=404, detail="Review item not found")
+        raise HTTPException(status_code=409, detail="Cannot complete review - item not in review or reviewer mismatch")
 
     await audit.log_event("review_decision", item.manifest.session_id if item.manifest else "unknown", {
         "item_id": item.id,
@@ -672,7 +678,7 @@ async def health_check():
 
 @app.post("/api/demo/reset")
 @limiter.limit("10/minute")
-async def demo_reset(request: Request, session_id: Optional[str] = None):
+async def demo_reset(request: Request, session_id: Optional[str] = None, _: bool = Depends(require_engine_ready)):
     """Reset all counters and optionally clear a session manifest."""
     await counters.reset_counters()
     if session_id:
