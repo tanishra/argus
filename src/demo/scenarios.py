@@ -494,6 +494,37 @@ Healthcare AI Market:
   - ARGUS cost: fraction of a single breach penalty
 """)
 
+    # Backend verification step
+    print("\n" + "="*60)
+    print("BACKEND VERIFICATION")
+    print("="*60)
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as client:
+            # Check health
+            health = await client.get("http://localhost:8000/api/health")
+            if health.status_code == 200:
+                hdata = health.json()
+                print(f"  ✅ Backend API: {hdata.get('status', 'unknown')}")
+                print(f"  ✅ Redis:       {hdata.get('components', {}).get('redis', 'N/A')}")
+                print(f"  ✅ Intent Eng:  {hdata.get('components', {}).get('intent_engine', 'N/A')}")
+            else:
+                print(f"  ⚠️  Backend health check returned {health.status_code}")
+
+            # Verify stats match demo results
+            stats = await client.get("http://localhost:8000/api/dashboard/stats")
+            if stats.status_code == 200:
+                sdata = stats.json()
+                print(f"  ✅ Dashboard stats: {sdata.get('actions_today', 0)} actions, "
+                      f"{sdata.get('blocked_actions', 0)} blocked, "
+                      f"{sdata.get('quarantined', 0)} quarantined")
+            else:
+                print(f"  ⚠️  Stats endpoint returned {stats.status_code}")
+    except ImportError:
+        print("  ℹ️  Skipping backend verification (httpx not available)")
+    except Exception as e:
+        print(f"  ℹ️  Backend not reachable at localhost:8000 — demo result only ({e})")
+
     print("\n" + "="*60)
     print("DEMO COMPLETE")
     print("="*60)

@@ -23,8 +23,9 @@ class SystemCounters:
 _counters = SystemCounters()
 _lock = asyncio.Lock()
 
-def get_counters() -> SystemCounters:
-    return deepcopy(_counters)
+async def get_counters() -> SystemCounters:
+    async with _lock:
+        return deepcopy(_counters)
 
 async def increment_sessions():
     async with _lock:

@@ -458,7 +458,7 @@ async def simulate_attack(
 
 async def get_lightweight_stats():
     """Get dashboard stats without traversing full review queue."""
-    c = counters.get_counters()
+    c = await counters.get_counters()
     return {
         "total_sessions": c.total_sessions,
         "actions_today": c.actions_today,
@@ -483,7 +483,7 @@ async def get_pending_reviews(limit: Optional[int] = None, _: bool = Depends(req
 
 
 @app.get("/api/reviews/{item_id}")
-async def get_review_item(item_id: str):
+async def get_review_item(item_id: str, _: bool = Depends(require_engine_ready)):
     """Get specific review item."""
     item = await _review_queue.get_item(item_id)
     if not item:
@@ -493,7 +493,7 @@ async def get_review_item(item_id: str):
 
 @app.post("/api/reviews/{item_id}/claim")
 @limiter.limit("30/minute")
-async def claim_review(request: Request, item_id: str, reviewer_id: str):
+async def claim_review(request: Request, item_id: str, reviewer_id: str, _: bool = Depends(require_engine_ready)):
     """Claim a review item for review."""
     item = await _review_queue.claim_item(item_id, reviewer_id)
     if not item:
@@ -541,7 +541,7 @@ async def get_review_statistics():
 async def get_dashboard_stats():
     """Get dashboard statistics."""
     queue_stats = await _review_queue.get_statistics()
-    c = counters.get_counters()
+    c = await counters.get_counters()
 
     return {
         "total_sessions": c.total_sessions,
@@ -600,8 +600,15 @@ async def export_compliance_report(session_id: str, format: str = "json", _: boo
     manifest = await session_store.get_manifest(session_id)
     manifest_data = manifest.to_dict() if manifest else {"error": "session not found"}
     
-    c = counters.get_counters()
+    c = await counters.get_counters()
     audit_log = await audit.get_recent_events(limit=50)
+    pending_items = await _review_queue.get_pending()
+    review_compliance = []
+    for item in pending_items[:5]:
+        compliance = await _review_queue.export_for_compliance(item.id)
+        if compliance:
+            review_compliance.append(compliance)
+
     report = {
         "session_id": session_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -609,7 +616,8 @@ async def export_compliance_report(session_id: str, format: str = "json", _: boo
         "actions_evaluated": c.actions_today,
         "actions_blocked": c.blocked_actions,
         "actions_quarantined": c.quarantined,
-        "review_items": [item.to_dict() for item in (await _review_queue.get_pending())[:5]],
+        "review_items": [item.to_dict() for item in pending_items[:5]],
+        "review_compliance": review_compliance,
         "audit_log": audit_log
     }
 

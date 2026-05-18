@@ -535,8 +535,9 @@ class LobsterTrapProxy:
                     )
             except Exception as e:
                 logger.warning("Failed to reach real Lobster Trap binary (%s). Falling back to simulation.", e)
+                return self.engine.evaluate_action(manifest, action)
 
-            return self.engine.evaluate_action(manifest, action)
+        return self.engine.evaluate_action(manifest, action)
 
     def create_detected_action(
         self,
