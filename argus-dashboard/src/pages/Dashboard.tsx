@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api } from '../lib/api'
+import { api, subscribeToFeed } from '../lib/api'
 import {
   Shield, Activity, AlertTriangle, Clock, Database,
   Cpu, FileSearch, Network, XCircle, PlayCircle, ChevronRight, Github,
@@ -49,7 +49,18 @@ export default function Dashboard() {
     }).finally(() => {
       if (!controller.signal.aborted) setIsLoading(false)
     })
-    return () => controller.abort()
+
+    const es = subscribeToFeed((event) => {
+      if (controller.signal.aborted) return
+      if (event.type === 'stats_update') {
+        setStats(mapStats(event.data))
+      }
+    })
+
+    return () => {
+      controller.abort()
+      es.close()
+    }
   }, [])
 
   return (

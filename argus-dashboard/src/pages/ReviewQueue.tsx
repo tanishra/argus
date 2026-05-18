@@ -83,6 +83,7 @@ export default function ReviewQueue() {
     if (submittingItems.has(itemId)) return
     setSubmittingItems(prev => new Set(prev).add(itemId))
     try {
+      await api.claimReview(itemId, 'admin')
       await api.submitReviewDecision(itemId, decision)
       setItems(prev => prev.filter(i => i.id !== itemId))
       setSelectedItem(null)
