@@ -1,0 +1,69 @@
+version: "1.0"
+policy_name: "argus-lobstertrap-integration"
+description: "ARGUS policy for real Veea Lobster Trap binary — DPI-level rules"
+
+default_action: ALLOW
+
+ingress_rules:
+  - name: block_prompt_injection
+    description: "DENY any prompt with injection patterns"
+    priority: 100
+    action: DENY
+    deny_message: "ARGUS + Lobster Trap: prompt injection detected and blocked."
+    conditions:
+      - field: contains_injection_patterns
+        match_type: boolean
+        value: true
+
+  - name: block_obfuscation_evasion
+    description: "DENY prompts using obfuscation to bypass filters"
+    priority: 95
+    action: DENY
+    deny_message: "ARGUS + Lobster Trap: obfuscation/evasion detected."
+    conditions:
+      - field: contains_obfuscation
+        match_type: boolean
+        value: true
+
+  - name: block_exfiltration
+    description: "DENY data exfiltration attempts"
+    priority: 92
+    action: DENY
+    deny_message: "ARGUS + Lobster Trap: data exfiltration prevented."
+    conditions:
+      - field: contains_exfiltration
+        match_type: boolean
+        value: true
+
+  - name: review_high_risk
+    description: "QUARANTINE prompts with elevated risk score"
+    priority: 70
+    action: HUMAN_REVIEW
+    conditions:
+      - field: risk_score
+        match_type: threshold
+        value: 0.6
+
+  - name: review_high_risk_pii
+    description: "QUARANTINE if high risk AND PII present"
+    priority: 75
+    action: HUMAN_REVIEW
+    conditions:
+      - field: risk_score
+        match_type: threshold
+        value: 0.4
+      - field: contains_pii
+        match_type: boolean
+        value: true
+
+  - name: log_pii_access
+    description: "LOG any prompt with PII but otherwise low risk"
+    priority: 30
+    action: LOG
+    conditions:
+      - field: contains_pii
+        match_type: boolean
+        value: true
+      - field: risk_score
+        match_type: threshold
+        value: 0.3

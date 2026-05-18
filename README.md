@@ -9,6 +9,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-orange.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Gemini](https://img.shields.io/badge/Gemini-Flash%20%7C%20Pro-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
+[![Veea Lobster Trap](https://img.shields.io/badge/Veea-Lobster%20Trap-f97316?style=for-the-badge)](https://github.com/veeainc/lobstertrap)
 [![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
 
 <br/>
@@ -156,24 +157,20 @@ curl -X POST http://localhost:8000/api/action/evaluate \
 
 ```
 argus/
-├── src/
-│   ├── intent_engine/       # Layer 1: Gemini Flash
-│   ├── lobster_proxy/       # Layer 2: Policy enforcement
-│   ├── explanation_engine/ # Layer 3B: Gemini Pro
-│   ├── human_gate/          # Layer 4: Review queue
-│   ├── demo/                # Demo scenarios
-│   └── main.py              # FastAPI application
-├── argus-dashboard/         # React dashboard
-├── tests/                   # Unit tests
-└── docs/                    # Full documentation
-```
-
-## Environment Variables
-
-```bash
-GEMINI_API_KEY=your_api_key_here      # Required
-GEMINI_MODEL=gemini-2.0-flash         # Default
-INTENT_LATENCY_TARGET_MS=300           # Default
+├── src/                   # Backend Application (FastAPI)
+│   ├── intent_engine/     # Layer 1: Gemini Flash
+│   ├── lobster_proxy/     # Layer 2: Policy enforcement
+│   ├── explanation_engine/# Layer 3: Gemini Pro
+│   ├── human_gate/        # Layer 4: Review queue
+│   ├── demo/              # Demo scenarios
+│   └── main.py            # FastAPI application
+├── argus-dashboard/       # React dashboard (Frontend)
+├── configs/               # System configurations (Policies)
+├── docs/                  # Full documentation
+├── infrastructure/        # Deployment scripts (EC2, Cloud-init)
+├── lobstertrap/           # Veea Lobster Trap binary (Submodule)
+├── scripts/               # Setup & automation scripts
+└── tests/                 # Unit tests
 ```
 
 ## License

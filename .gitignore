@@ -167,3 +167,6 @@ temp/
 # Keep these files in git
 !requirements.txt
 !.env.example
+
+lobster-trap
+lobstertrap/.git/

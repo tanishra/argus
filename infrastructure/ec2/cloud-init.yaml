@@ -1,0 +1,55 @@
+#cloud-config
+package_update: true
+
+packages:
+  - docker.io
+  - debian-keyring
+  - debian-archive-keyring
+  - apt-transport-https
+
+runcmd:
+  # Install Caddy
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update
+  - apt-get install -y caddy
+
+  # Start Docker
+  - systemctl enable docker
+  - systemctl start docker
+
+  # Create swap (t2.micro only has 1GB RAM — helps Go build)
+  - fallocate -l 2G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+  # Clone repo
+  - git clone https://github.com/tanishra/argus.git /opt/argus
+  - git clone https://github.com/veeainc/lobstertrap /opt/argus/lobstertrap
+
+  # Build Docker image (multi-stage: compiles Lobster Trap Go binary → Python runtime)
+  - cd /opt/argus && docker build -t argus-backend .
+
+  # Create data directory and env file
+  - mkdir -p /etc/argus /opt/argus/data
+  - echo 'GEMINI_API_KEY=' > /etc/argus/.env
+  - echo 'CORS_ORIGINS=https://tanish.website,https://argus.tanish.website' >> /etc/argus/.env
+  - echo 'DEMO_MODE=true' >> /etc/argus/.env
+  - echo 'USE_LOBSTER_TRAP_BINARY=true' >> /etc/argus/.env
+  - echo 'DATABASE_URL=sqlite+aiosqlite:////opt/argus/data/argus.db' >> /etc/argus/.env
+  - echo 'AUDIT_LOG_PATH=/opt/argus/data/audit.log' >> /etc/argus/.env
+  - echo 'INTENT_LATENCY_TARGET_MS=300' >> /etc/argus/.env
+
+  # Run Docker container
+  - docker run -d --name argus-backend --restart unless-stopped -p 127.0.0.1:8000:8000 --env-file /etc/argus/.env -v /opt/argus/data:/opt/argus/data argus-backend
+
+  # Configure Caddy (reverse proxy argus.tanish.website → localhost:8000)
+  - echo 'argus.tanish.website {' > /etc/caddy/Caddyfile
+  - echo '    reverse_proxy localhost:8000' >> /etc/caddy/Caddyfile
+  - echo '}' >> /etc/caddy/Caddyfile
+
+  # Start Caddy with HTTPS (auto-provisions Let's Encrypt)
+  - systemctl enable caddy
+  - systemctl restart caddy

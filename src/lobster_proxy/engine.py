@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import json
 import logging
-import re
-import time
 import os
+import re
+import subprocess
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -493,16 +494,112 @@ class LobsterTrapEngine:
 
 class LobsterTrapProxy:
     """
-    High-level proxy for Lobster Trap integration.
+    High-level proxy for Veea Lobster Trap integration.
 
-    Provides the API surface for the ARGUS system to interact
-    with the policy enforcement layer.
+    When USE_LOBSTER_TRAP_BINARY=true and the binary is available,
+    results from the real Lobster Trap DPI engine are merged with
+    ARGUS's action-level intent comparison for a holistic decision.
+    
+    Binary path resolved from LOBSTER_TRAP_BINARY_PATH env var,
+    defaulting to ./lobster-trap/lobstertrap then ./lobstertrap/lobstertrap.
     """
 
     def __init__(self):
         self.engine = LobsterTrapEngine()
         self._policy_cache: dict[str, dict] = {}
         self.use_real_binary = os.getenv("USE_LOBSTER_TRAP_BINARY", "false").lower() == "true"
+        self._policy_path = os.getenv(
+            "LOBSTER_TRAP_POLICY_PATH",
+            os.path.join(os.path.dirname(__file__), "..", "..", "configs", "lobstertrap_policy.yaml")
+        )
+        self.binary_path = self._find_binary()
+
+    def _find_binary(self) -> Optional[str]:
+        """Locate the lobstertrap binary."""
+        env_path = os.getenv("LOBSTER_TRAP_BINARY_PATH")
+        if env_path and os.path.isfile(env_path):
+            return os.path.abspath(env_path)
+
+        project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+        candidates = [
+            os.path.join(project_root, "lobster-trap", "lobstertrap"),
+            os.path.join(project_root, "lobstertrap", "lobstertrap"),
+            "lobster-trap/lobstertrap",
+            "lobstertrap/lobstertrap",
+        ]
+        for path in candidates:
+            if os.path.isfile(path):
+                return os.path.abspath(path)
+        return None
+
+    def _parse_binary_output(self, raw: str) -> dict:
+        """Parse Lobster Trap binary's mixed text/JSON output."""
+        result: dict[str, Any] = {
+            "metadata": {},
+            "policy_action": None,
+            "policy_rule": None,
+            "policy_message": None,
+        }
+
+        json_match = re.search(r'\{[\s\S]*?\}', raw)
+        if json_match:
+            try:
+                result["metadata"] = json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+
+        action_m = re.search(r'Action:\s+(\w+)', raw)
+        if action_m:
+            result["policy_action"] = action_m.group(1)
+
+        rule_m = re.search(r'Rule:\s+(\S+)', raw)
+        if rule_m:
+            result["policy_rule"] = rule_m.group(1)
+
+        msg_m = re.search(r'Message:\s+(.+)', raw)
+        if msg_m:
+            result["policy_message"] = msg_m.group(1).strip()
+
+        return result
+
+    def _run_binary_inspect(self, prompt_text: str) -> Optional[dict]:
+        """Run the real Lobster Trap binary's inspect command."""
+        if not self.binary_path:
+            return None
+
+        cmd = [self.binary_path, "inspect"]
+        policy_file = self._resolve_policy_path()
+        if policy_file:
+            cmd.extend(["--policy", policy_file])
+
+        try:
+            result = subprocess.run(
+                cmd + [prompt_text],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0:
+                return self._parse_binary_output(result.stdout)
+            else:
+                logger.warning("Lobster Trap binary returned code %d: %s", result.returncode, result.stderr[:200])
+        except FileNotFoundError:
+            logger.warning("Lobster Trap binary not found at %s", self.binary_path)
+        except subprocess.TimeoutExpired:
+            logger.warning("Lobster Trap binary timed out")
+        except Exception as e:
+            logger.warning("Lobster Trap binary error: %s", e)
+
+        return None
+
+    def _resolve_policy_path(self) -> Optional[str]:
+        """Resolve policy file path for the binary."""
+        if os.path.isfile(self._policy_path):
+            return os.path.abspath(self._policy_path)
+
+        project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+        default_policy = os.path.join(project_root, "lobstertrap", "configs", "default_policy.yaml")
+        if os.path.isfile(default_policy):
+            return os.path.abspath(default_policy)
+        return None
 
     def process_action(
         self,
@@ -512,31 +609,87 @@ class LobsterTrapProxy:
         """
         Process a single action through the policy engine.
 
-        This is the main entry point from the FastAPI backend.
+        When the real Lobster Trap binary is available, runs DPI on the
+        action parameters and merges results with ARGUS's intent comparison.
+        Otherwise falls back to the pure-Python simulation engine.
         """
-        if self.use_real_binary:
-            try:
-                import subprocess
-                prompt_text = json.dumps({"manifest": manifest.to_dict(), "action": action.to_dict()})
-                result = subprocess.run(
-                    ["./lobster-trap/lobstertrap", "inspect", prompt_text],
-                    capture_output=True, text=True, timeout=3
-                )
-                if result.returncode == 0:
-                    data = json.loads(result.stdout)
-                    return PolicyEvaluation(
-                        decision=Decision(data.get("decision", "error")),
-                        risk_score=data.get("risk_score", 1.0),
-                        risk_level=RiskThreshold(data.get("risk_level", "high")),
-                        reason=data.get("reason", "Evaluated by Lobster Trap proxy"),
-                        mismatches=data.get("mismatches", []),
-                        evaluation_time_ms=data.get("evaluation_time_ms", 0.0)
-                    )
-            except Exception as e:
-                logger.warning("Failed to reach real Lobster Trap binary (%s). Falling back to simulation.", e)
-                return self.engine.evaluate_action(manifest, action)
+        if not self.use_real_binary or self.binary_path is None:
+            return self.engine.evaluate_action(manifest, action)
 
-        return self.engine.evaluate_action(manifest, action)
+        start = time.time()
+
+        try:
+            prompt_text = json.dumps({"manifest": manifest.to_dict(), "action": action.to_dict()})
+            binary_result = self._run_binary_inspect(prompt_text)
+        except Exception:
+            binary_result = None
+
+        sim_eval = self.engine.evaluate_action(manifest, action)
+
+        if binary_result is None:
+            return sim_eval
+
+        meta = binary_result.get("metadata", {})
+        if not isinstance(meta, dict):
+            meta = {}
+
+        inject_detected = meta.get("contains_injection_patterns", False)
+        exfil_detected = meta.get("contains_exfiltration", False)
+        pii_detected = meta.get("contains_pii", False)
+        obfus_detected = meta.get("contains_obfuscation", False)
+        binary_risk = meta.get("risk_score", 0)
+        if not isinstance(binary_risk, (int, float)):
+            binary_risk = 0
+
+        evidence = dict(sim_eval.evidence) if sim_eval.evidence else {}
+        evidence["lobster_trap_integration"] = True
+        evidence["lobster_trap_policy_action"] = binary_result.get("policy_action")
+        evidence["lobster_trap_policy_rule"] = binary_result.get("policy_rule")
+        if inject_detected:
+            evidence["lobster_trap_injection_detected"] = True
+        if exfil_detected:
+            evidence["lobster_trap_exfiltration_detected"] = True
+        if pii_detected:
+            evidence["lobster_trap_pii_detected"] = True
+        if obfus_detected:
+            evidence["lobster_trap_obfuscation_detected"] = True
+        if meta.get("target_domains"):
+            evidence["lobster_trap_target_domains"] = meta["target_domains"]
+
+        mismatches = list(sim_eval.mismatches)
+        if inject_detected:
+            mismatches.append("Prompt injection patterns detected by Lobster Trap DPI")
+        if exfil_detected:
+            mismatches.append("Exfiltration signals detected by Lobster Trap DPI")
+
+        risk_score = max(sim_eval.risk_score, float(binary_risk))
+
+        risk_level = sim_eval.risk_level
+        if binary_risk >= 0.7 and sim_eval.risk_level.value in ("low", "medium"):
+            risk_level = RiskThreshold.HIGH
+
+        decision = sim_eval.decision
+        binary_action = binary_result.get("policy_action")
+        if binary_action == "DENY" and decision in (Decision.ALLOW, Decision.LOG_AND_ALLOW):
+            decision = Decision.DENY
+            if "Prompt injection patterns detected" not in str(mismatches):
+                mismatches.append("Lobster Trap DPI escalated action to DENY")
+        elif binary_action == "HUMAN_REVIEW" and decision in (Decision.ALLOW, Decision.LOG_AND_ALLOW):
+            decision = Decision.HUMAN_REVIEW
+
+        policy_message = binary_result.get("policy_message") or "Evaluated by Lobster Trap DPI + ARGUS intent engine"
+        eval_time_ms = (time.time() - start) * 1000
+
+        return PolicyEvaluation(
+            decision=decision,
+            risk_score=risk_score,
+            risk_level=risk_level,
+            reason=policy_message,
+            mismatches=mismatches,
+            evidence=evidence,
+            policy_version=f"{sim_eval.policy_version}+lobstertrap",
+            evaluation_time_ms=eval_time_ms,
+        )
 
     def create_detected_action(
         self,
