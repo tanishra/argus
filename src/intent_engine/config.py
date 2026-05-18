@@ -38,7 +38,7 @@ class IntentEngineConfig(BaseModel):
 class ExtractionConfig:
     """Runtime configuration for intent extraction."""
     temperature: float = 0.1
-    max_output_tokens: int = 512
+    max_output_tokens: int = 1024
     response_mime_type: str = "application/json"
 
     # Extraction prompts
@@ -77,7 +77,7 @@ IMPORTANT:
 - If action is not explicitly allowed, add it to forbidden_actions
 - For healthcare tasks, ALWAYS add export_phi, forward_phi_external, delete_patient_record to forbidden_actions
 - Extract scope as specifically as possible
-- Return ONLY valid JSON, no additional text"""
+- Return ONLY valid, complete JSON. DO NOT use markdown code blocks (no ```). DO NOT add any text before or after. Every string must be properly closed with double quotes."""
 
     @property
     def full_system_prompt(self) -> str:

@@ -262,17 +262,77 @@ class IntentExtractor:
                 fallback_used=True
             )
 
-    def _extract_json_fallback(self, raw_output: str) -> Optional[dict]:
-        """Attempt to extract JSON from non-standard output."""
-        start_idx = raw_output.find("{")
-        end_idx = raw_output.rfind("}")
+    def _repair_json(self, text: str) -> Optional[str]:
+        """Attempt to repair common JSON truncation issues."""
+        text = text.strip()
+        if not text:
+            return None
 
-        if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
-            json_str = raw_output[start_idx:end_idx + 1]
+        stack = []
+        in_string = False
+        escaped = False
+        for i, ch in enumerate(text):
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\':
+                escaped = True
+                continue
+            if ch == '"' and not escaped:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch in '{[':
+                stack.append(ch)
+            elif ch == '}':
+                if stack and stack[-1] == '{':
+                    stack.pop()
+            elif ch == ']':
+                if stack and stack[-1] == '[':
+                    stack.pop()
+
+        # Close unterminated string
+        if in_string:
+            text += '"'
+
+        # Close unclosed brackets in reverse order
+        for bracket in reversed(stack):
+            text += '}' if bracket == '{' else ']'
+
+        # Remove trailing commas before } or ]
+        import re
+        text = re.sub(r',\s*([}\]])', r'\1', text)
+
+        return text
+
+    def _extract_json_fallback(self, raw_output: str) -> Optional[dict]:
+        """Attempt to extract JSON from non-standard output, with repair."""
+        start_idx = raw_output.find("{")
+        if start_idx == -1:
+            return None
+
+        # Extract from opening brace to end — no closing brace required
+        json_str = raw_output[start_idx:]
+
+        # Strip trailing non-JSON content
+        end_idx = json_str.rfind("}")
+        if end_idx != -1:
+            json_str = json_str[:end_idx + 1]
+
+        # Try direct parse first
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+
+        # Attempt repair
+        repaired = self._repair_json(json_str)
+        if repaired:
             try:
-                return json.loads(json_str)
+                return json.loads(repaired)
             except json.JSONDecodeError:
-                return None
+                pass
 
         return None
 
