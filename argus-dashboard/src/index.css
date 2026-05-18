@@ -73,9 +73,13 @@
     background-color: hsl(var(--card));
   }
   .dark .bg-rose-50,
+  .dark .bg-rose-50\/50,
   .dark .bg-rose-50\/70,
   .dark .bg-rose-50\/80 {
-    background-color: hsl(var(--destructive) / 0.15);
+    background-color: hsl(var(--destructive) / 0.08);
+  }
+  .dark .bg-rose-100 {
+    background-color: hsl(var(--destructive) / 0.2);
   }
   .dark ::selection {
     background-color: hsl(var(--primary) / 0.15);

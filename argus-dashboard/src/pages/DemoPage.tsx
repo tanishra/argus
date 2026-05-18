@@ -343,7 +343,7 @@ export default function DemoPage() {
               })()
             )}
           </div>
-          {unprotectedLogs.length > 0 && unprotectedLogs[unprotectedLogs.length - 1]?.type === 'error' && (
+          {unprotectedLogs.some(log => log.type === 'error') && (
             <div className="px-5 py-3.5 bg-rose-50/70 border-t border-border/50">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
