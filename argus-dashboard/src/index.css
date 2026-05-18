@@ -24,6 +24,61 @@
     --border: 48 8% 89%;
     --input: 48 8% 89%;
     --ring: 245 58% 51%;
+    --success: 160 94% 30%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 95% 44%;
+    --warning-foreground: 0 0% 100%;
+  }
+
+  .dark {
+    --background: 220 66% 9%;
+    --foreground: 222 82% 92%;
+    --card: 218 41% 14%;
+    --card-foreground: 222 82% 92%;
+    --popover: 218 41% 14%;
+    --popover-foreground: 222 82% 92%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 220 66% 9%;
+    --secondary: 222 26% 22%;
+    --secondary-foreground: 222 82% 92%;
+    --muted: 222 26% 22%;
+    --muted-foreground: 210 4% 78%;
+    --accent: 203 100% 77%;
+    --accent-foreground: 220 66% 9%;
+    --destructive: 8 100% 84%;
+    --destructive-foreground: 220 66% 9%;
+    --border: 200 2% 27%;
+    --input: 200 2% 27%;
+    --ring: 239 84% 67%;
+    --success: 142 71% 45%;
+    --success-foreground: 220 66% 9%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 66% 9%;
+  }
+
+  .dark .bg-white {
+    --tw-bg-opacity: 1;
+    background-color: hsl(var(--card) / var(--tw-bg-opacity));
+  }
+  .dark .bg-white\/85 {
+    background-color: hsl(var(--card) / 0.85);
+  }
+  .dark .bg-white\/40 {
+    background-color: hsl(var(--card) / 0.4);
+  }
+  .dark .premium-card {
+    background-color: hsl(var(--card));
+  }
+  .dark .premium-input {
+    background-color: hsl(var(--card));
+  }
+  .dark .bg-rose-50,
+  .dark .bg-rose-50\/80 {
+    background-color: hsl(var(--destructive) / 0.15);
+  }
+  .dark ::selection {
+    background-color: hsl(var(--primary) / 0.15);
+    color: hsl(var(--primary));
   }
 
   * { @apply border-border; }

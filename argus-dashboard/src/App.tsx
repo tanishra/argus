@@ -4,15 +4,16 @@ import Dashboard from './pages/Dashboard'
 import ReviewQueue from './pages/ReviewQueue'
 import CompliancePage from './pages/CompliancePage'
 import DemoPage from './pages/DemoPage'
-import { Shield, LayoutDashboard, ListChecks, FileText, PlayCircle, Menu, X, Home } from 'lucide-react'
+import { Shield, ListChecks, FileText, PlayCircle, Menu, X, Home, Sun, Moon } from 'lucide-react'
+import { useTheme } from './ThemeContext'
 
 const navItems = [
-  { name: 'Overview', path: '/', icon: LayoutDashboard, label: 'Dashboard overview' },
   { name: 'Review Queue', path: '/reviews', icon: ListChecks, label: 'Pending reviews' },
   { name: 'Compliance', path: '/compliance', icon: FileText, label: 'Audit reports' },
 ]
 
 function Navbar() {
+  const { theme, toggleTheme } = useTheme()
   const location = useLocation()
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -37,6 +38,13 @@ function Navbar() {
           </a>
 
           <div className="hidden md:flex items-center gap-1">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-all duration-200"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             {navItems.map((item) => {
               const active = location.pathname === item.path
               return (
@@ -75,6 +83,14 @@ function Navbar() {
 
       {mobileOpen && (
         <div className="md:hidden bg-white border-b border-border/40 px-4 pb-4 pt-2 space-y-1 animate-fade-in shadow-sm">
+          <button
+            onClick={() => { toggleTheme(); setMobileOpen(false) }}
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+          <div className="w-full h-px bg-border/40 my-1" />
           {[...navItems, { name: 'Live Demo', path: '/demo', icon: PlayCircle, label: 'Interactive playground' }].map((item) => {
             const active = location.pathname === item.path
             const Icon = item.icon
