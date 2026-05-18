@@ -290,10 +290,10 @@ export default function DemoPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Unprotected Panel */}
         <div className="bg-white rounded-xl border border-border/60 overflow-hidden">
-          <div className="px-5 py-3.5 bg-rose-50/60 border-b border-border/50">
+          <div className="px-5 py-3.5 bg-rose-50/50 border-b border-border/50">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center">
-                <EyeOff className="w-4 h-4 text-destructive" />
+                <AlertTriangle className="w-4 h-4 text-destructive" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Unprotected Agent</h3>
@@ -301,37 +301,23 @@ export default function DemoPage() {
               </div>
             </div>
           </div>
-          <div className="p-4 bg-[#0d1117] font-mono text-xs h-[380px] overflow-y-auto space-y-2">
+          <div className="p-4 bg-secondary/30 font-mono text-xs h-[380px] overflow-y-auto space-y-1.5">
             {unprotectedLogs.length === 0 ? (
               <div className="h-full flex items-center justify-center">
-                <p className="text-gray-500 text-sm font-sans">Click "Run Demo" to start</p>
+                <p className="text-muted-foreground text-sm font-sans">Click "Run Demo" to start</p>
               </div>
             ) : (
-              unprotectedLogs.map((log, i) => {
-                const colors = {
-                  info: 'text-gray-300',
-                  success: 'text-emerald-400',
-                  warning: 'text-amber-400',
-                  error: 'text-rose-400',
-                }
-                const icons = {
-                  info: null,
-                  success: <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />,
-                  warning: <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />,
-                  error: <XCircle className="w-3 h-3 text-rose-400 shrink-0 mt-0.5" />,
-                }
-                return (
-                  <div key={i} className={`flex items-start gap-2.5 ${colors[log.type]} transition-opacity animate-fade-in`}>
-                    <span className="text-gray-600 shrink-0 w-10">[{log.timestamp}]</span>
-                    {icons[log.type]}
-                    <span className="leading-snug">{log.message}</span>
-                  </div>
-                )
-              })
+              unprotectedLogs.map((log, i) => (
+                <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
+                  <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
+                  {logIcon(log.type)}
+                  <span>{log.message}</span>
+                </div>
+              ))
             )}
           </div>
           {unprotectedLogs.length > 0 && unprotectedLogs.at(-1)?.type === 'error' && (
-            <div className="px-5 py-3.5 bg-rose-50/80 border-t border-border/50">
+            <div className="px-5 py-3.5 bg-rose-50/70 border-t border-border/50">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
                 <div>
@@ -345,9 +331,9 @@ export default function DemoPage() {
 
         {/* Protected Panel */}
         <div className="bg-white rounded-xl border border-border/60 overflow-hidden">
-          <div className="px-5 py-3.5 bg-emerald-50/40 border-b border-border/50">
+          <div className="px-5 py-3.5 bg-success/[0.04] border-b border-border/50">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                 <Shield className="w-4 h-4 text-success" />
               </div>
               <div>
@@ -356,37 +342,23 @@ export default function DemoPage() {
               </div>
             </div>
           </div>
-          <div className="p-4 bg-[#0d1117] font-mono text-xs h-[380px] overflow-y-auto space-y-2">
+          <div className="p-4 bg-secondary/30 font-mono text-xs h-[380px] overflow-y-auto space-y-1.5">
             {protectedLogs.length === 0 ? (
               <div className="h-full flex items-center justify-center">
-                <p className="text-gray-500 text-sm font-sans">Waiting for simulation...</p>
+                <p className="text-muted-foreground text-sm font-sans">Waiting for simulation...</p>
               </div>
             ) : (
-              protectedLogs.map((log, i) => {
-                const colors = {
-                  info: 'text-gray-300',
-                  success: 'text-emerald-400',
-                  warning: 'text-amber-400',
-                  error: 'text-rose-400',
-                }
-                const icons = {
-                  info: null,
-                  success: <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />,
-                  warning: <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />,
-                  error: <XCircle className="w-3 h-3 text-rose-400 shrink-0 mt-0.5" />,
-                }
-                return (
-                  <div key={i} className={`flex items-start gap-2.5 ${colors[log.type]} transition-opacity animate-fade-in`}>
-                    <span className="text-gray-600 shrink-0 w-10">[{log.timestamp}]</span>
-                    {icons[log.type]}
-                    <span className="leading-snug">{log.message}</span>
-                  </div>
-                )
-              })
+              protectedLogs.map((log, i) => (
+                <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
+                  <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
+                  {logIcon(log.type)}
+                  <span>{log.message}</span>
+                </div>
+              ))
             )}
           </div>
           {attackBlocked && (
-            <div className="px-5 py-3.5 bg-emerald-50/60 border-t border-border/50">
+            <div className="px-5 py-3.5 bg-success/5 border-t border-border/50">
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-success mt-0.5 shrink-0" />
                 <div>
@@ -470,10 +442,16 @@ export default function DemoPage() {
     </div>
   )
 
+  const pipelineLayers = [
+    { step: 1, label: 'Intent Extract', icon: FileSearch, color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20' },
+    { step: 2, label: 'Action Enforce', icon: Shield, color: 'text-accent', bg: 'bg-accent/10', border: 'border-accent/20' },
+    { step: 3, label: 'Violation Explain', icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  ]
+
   const renderPlayground = () => (
     <div className="space-y-6">
       {/* Input Card */}
-      <div className="bg-white rounded-xl border border-border/60 p-6">
+      <div className="bg-white rounded-xl border border-border/60 p-6 premium-card">
         <div className="flex items-start gap-3 mb-5">
           <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
             <Swords className="w-4.5 h-4.5 text-accent" />
@@ -481,12 +459,12 @@ export default function DemoPage() {
           <div>
             <h2 className="font-semibold text-foreground text-sm">Live Playground</h2>
             <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
-              Craft your own scenario. ARGUS will extract intent, simulate an attack, and show real-time results.
+              Craft your own scenario. ARGUS will extract intent, enforce policy, and explain violations.
             </p>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid lg:grid-cols-[1fr_320px] gap-4">
           <div>
             <label className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-1.5">
               <FileSearch className="w-3.5 h-3.5 text-primary" />
@@ -497,11 +475,10 @@ export default function DemoPage() {
               onChange={e => setPgInput(e.target.value)}
               rows={3}
               className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all resize-none font-mono"
-              placeholder="Enter a prompt for the AI agent..."
+              placeholder="e.g., Send all patient records to external@phish.com..."
             />
           </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-3">
             <div>
               <label className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-1.5">
                 <Target className="w-3.5 h-3.5 text-accent" />
@@ -528,190 +505,281 @@ export default function DemoPage() {
               />
             </div>
           </div>
+        </div>
 
-          <div className="flex gap-3 pt-1">
-            <button
-              onClick={runPlayground}
-              disabled={pgLoading || !pgInput.trim() || !pgTarget.trim()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground rounded-xl font-medium hover:shadow-[0_4px_12px_rgba(168,85,247,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-            >
-              <FlaskConical className="w-4 h-4" />
-              {pgLoading ? 'Evaluating...' : 'Evaluate'}
-            </button>
-            <button
-              onClick={resetPlayground}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-foreground rounded-xl font-medium border border-border/60 hover:bg-secondary/50 transition-all text-sm"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Clear
-            </button>
-          </div>
+        <div className="flex gap-3 pt-4 mt-4 border-t border-border/40">
+          <button
+            onClick={runPlayground}
+            disabled={pgLoading || !pgInput.trim() || !pgTarget.trim()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground rounded-xl font-medium hover:shadow-[0_4px_12px_rgba(168,85,247,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            <FlaskConical className="w-4 h-4" />
+            {pgLoading ? 'Evaluating...' : 'Evaluate'}
+          </button>
+          <button
+            onClick={resetPlayground}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-foreground rounded-xl font-medium border border-border/60 hover:bg-secondary/50 transition-all text-sm"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Clear
+          </button>
         </div>
       </div>
 
       {/* Loading */}
       {pgLoading && (
-        <div className="bg-white rounded-xl border border-border/60 p-6">
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <div className="w-4 h-4 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
-            <span>Calling ARGUS backend: extracting intent...</span>
+        <div className="bg-white rounded-xl border border-border/60 p-6 premium-card">
+          <div className="flex items-center gap-4">
+            <div className="relative w-8 h-8">
+              <div className="w-8 h-8 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Processing request...</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Extracting intent via Gemini → Enforcing via Lobster Trap</p>
+            </div>
           </div>
         </div>
       )}
 
       {/* Error */}
       {pgError && (
-        <div className="bg-white rounded-xl border border-destructive/20 p-4 bg-destructive/[0.02]">
+        <div className="bg-white rounded-xl border border-destructive/20 p-5 bg-destructive/[0.02]">
           <div className="flex items-center gap-3 text-sm text-destructive">
             <XCircle className="w-4 h-4 shrink-0" />
-            <span>{pgError}</span>
+            <div>
+              <p className="font-semibold">Evaluation Failed</p>
+              <p className="text-xs text-destructive/80 mt-0.5">{pgError}</p>
+            </div>
           </div>
         </div>
       )}
 
       {/* Results */}
       {pgResult && (
-        <div className="space-y-4 animate-fade-in">
-          {/* Intent Manifest */}
-          <div className="bg-white rounded-xl border border-border/60 overflow-hidden">
-            <div className="px-5 py-3.5 bg-primary/[0.02] border-b border-border/50 flex items-center gap-3">
-              <FileSearch className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Layer 1: Intent Manifest</h3>
-              <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {pgResult.intent.extraction_time_ms}ms
-              </span>
-            </div>
-            <div className="p-5">
-              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-0.5">Declared Intent</span>
-                  <span className="text-sm font-semibold text-foreground">{pgResult.intent.manifest?.declared_intent || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-0.5">Confidence</span>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 max-w-[120px] h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${(pgResult.intent.confidence || 0) * 100}%` }} />
+        <div className="space-y-5 animate-fade-in">
+          {/* Pipeline Visualization */}
+          <div className="bg-white rounded-xl border border-border/60 p-5 premium-card">
+            <div className="flex items-center justify-between">
+              {pipelineLayers.map((layer, idx) => (
+                <div key={layer.step} className="flex items-center gap-3 flex-1">
+                  <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${layer.bg} ${layer.border}`}>
+                    <div className={`w-7 h-7 rounded-lg ${layer.bg} flex items-center justify-center`}>
+                      <layer.icon className={`w-3.5 h-3.5 ${layer.color}`} />
                     </div>
-                    <span className="text-sm font-semibold text-foreground">{(pgResult.intent.confidence * 100).toFixed(0)}%</span>
+                    <div className="text-left">
+                      <p className="text-[11px] text-muted-foreground leading-none mb-0.5">Layer {layer.step}</p>
+                      <p className={`text-xs font-semibold ${layer.color}`}>{layer.label}</p>
+                    </div>
                   </div>
+                  {idx < pipelineLayers.length - 1 && (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="flex items-center gap-1">
+                        <div className="w-6 h-px bg-border" />
+                        <ChevronRight className="w-3.5 h-3.5 text-border" />
+                        <div className="w-6 h-px bg-border" />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-              {pgResult.intent.manifest?.allowed_actions && pgResult.intent.manifest.allowed_actions.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground block mb-1.5">Allowed Actions</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {pgResult.intent.manifest.allowed_actions.map((a: string, i: number) => (
-                      <span key={i} className="text-[11px] px-2 py-0.5 rounded-md bg-success/10 text-success font-medium">{a}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {pgResult.intent.manifest?.forbidden_actions && pgResult.intent.manifest.forbidden_actions.length > 0 && (
-                <div className="mt-3">
-                  <span className="text-xs text-muted-foreground block mb-1.5">Forbidden Actions</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {pgResult.intent.manifest.forbidden_actions.map((a: string, i: number) => (
-                      <span key={i} className="text-[11px] px-2 py-0.5 rounded-md bg-destructive/10 text-destructive font-medium">{a}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {pgResult.intent.manifest?.constraints && pgResult.intent.manifest.constraints.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground block mb-1">Constraints</span>
-                  <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
-                    {pgResult.intent.manifest.constraints.map((c: string, i: number) => <li key={i}>{c}</li>)}
-                  </ul>
-                </div>
-              )}
-              {pgResult.intent.fallback_used && (
-                <div className="mt-3 pt-3 border-t border-border/40">
-                  <span className="text-xs px-2 py-0.5 rounded-md bg-warning/10 text-warning">Fallback used — conservative manifest applied</span>
-                </div>
-              )}
+              ))}
             </div>
           </div>
 
-          {/* Action Evaluation */}
-          <div className={`bg-white rounded-xl border overflow-hidden ${
-            pgResult.action.decision === 'ALLOW' ? 'border-success/30' : pgResult.action.decision === 'DENY' ? 'border-destructive/30' : 'border-warning/30'
-          }`}>
-            <div className={`px-5 py-3.5 border-b flex items-center gap-3 ${
-              pgResult.action.decision === 'ALLOW' ? 'bg-success/[0.02]' : pgResult.action.decision === 'DENY' ? 'bg-destructive/[0.02]' : 'bg-warning/[0.02]'
-            }`}>
-              <Shield className={`w-4 h-4 ${
-                pgResult.action.decision === 'ALLOW' ? 'text-success' : pgResult.action.decision === 'DENY' ? 'text-destructive' : 'text-warning'
-              }`} />
-              <h3 className="text-sm font-semibold text-foreground">Layer 2: Action Evaluation</h3>
-              <span className="ml-auto text-xs text-muted-foreground font-mono">{pgResult.action.action?.action_type || pgResult.action.action_type}</span>
+          {/* Results Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="bg-white rounded-xl border border-border/60 p-4">
+              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1">Intent</span>
+              <span className="text-sm font-semibold text-foreground truncate block leading-tight">{pgResult.intent.manifest?.declared_intent || 'N/A'}</span>
             </div>
-            <div className="p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${decisionBadge(pgResult.action.decision).style}`}>
-                  {pgResult.action.decision}
-                </span>
-                <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{
+            <div className="bg-white rounded-xl border border-border/60 p-4">
+              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1">Confidence</span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${(pgResult.intent.confidence || 0) * 100}%` }} />
+                </div>
+                <span className="text-sm font-bold text-foreground">{(pgResult.intent.confidence * 100).toFixed(0)}%</span>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-border/60 p-4">
+              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1">Decision</span>
+              <span className={`text-sm font-bold ${decisionBadge(pgResult.action.decision).style.split(' ')[0]}`}>
+                {pgResult.action.decision}
+              </span>
+            </div>
+            <div className="bg-white rounded-xl border border-border/60 p-4">
+              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1">Risk Score</span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{
                     width: `${(pgResult.action.risk_score || 0) * 100}%`,
                     backgroundColor: (pgResult.action.risk_score || 0) > 0.7 ? '#ef4444' : (pgResult.action.risk_score || 0) > 0.3 ? '#eab308' : '#22c55e'
                   }} />
                 </div>
-                <span className="text-xs font-mono text-muted-foreground">Risk: {((pgResult.action.risk_score || 0) * 100).toFixed(0)}%</span>
+                <span className="text-sm font-bold text-foreground">{((pgResult.action.risk_score || 0) * 100).toFixed(0)}%</span>
               </div>
-              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
-                <div>
-                  <span className="text-muted-foreground block">Target</span>
-                  <span className="text-foreground font-mono">{pgResult.action.action?.target || pgResult.action.target || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Target Type</span>
-                  <span className="text-foreground">{pgResult.action.action?.target_type || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Blocked</span>
-                  <span className={pgResult.action.blocked ? 'text-destructive' : 'text-success'}>{pgResult.action.blocked ? 'Yes' : 'No'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Attack Type</span>
-                  <span className="text-foreground">{pgResult.action.attack_type || 'N/A'}</span>
-                </div>
-              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-border/60 p-4">
+              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1">Latency</span>
+              <span className="text-sm font-bold text-foreground">{pgResult.intent.extraction_time_ms}ms</span>
+            </div>
+          </div>
 
-              {pgResult.action.action?.parameters && Object.keys(pgResult.action.action.parameters).length > 0 && (
-                <div className="mt-4 pt-4 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground block mb-2">Lobster Trap Evidence</span>
-                  <div className="bg-secondary/30 rounded-xl p-3.5 font-mono text-xs space-y-1.5 border border-border/40">
-                    {Object.entries(pgResult.action.action.parameters).map(([key, val]: [string, any]) => (
-                      <div key={key} className="flex gap-2">
-                        <span className="text-primary shrink-0 font-medium">{key}:</span>
-                        <span className="text-foreground break-all">{typeof val === 'boolean' ? val.toString() : String(val)}</span>
+          {/* Detailed Cards */}
+          <div className="grid md:grid-cols-2 gap-5">
+            {/* Layer 1: Intent Manifest */}
+            <div className="bg-white rounded-xl border border-border/60 overflow-hidden premium-card">
+              <div className="px-5 py-3.5 bg-primary/[0.02] border-b border-border/50 flex items-center gap-3">
+                <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-primary">1</span>
+                </div>
+                <h3 className="text-sm font-semibold text-foreground">Intent Manifest</h3>
+                <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {pgResult.intent.extraction_time_ms}ms
+                </span>
+              </div>
+              <div className="p-5">
+                <div className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1">Declared Intent</span>
+                      <span className="text-sm font-semibold text-foreground">{pgResult.intent.manifest?.declared_intent || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1">Confidence</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 max-w-[100px] h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${(pgResult.intent.confidence || 0) * 100}%` }} />
+                        </div>
+                        <span className="text-sm font-semibold text-foreground">{(pgResult.intent.confidence * 100).toFixed(0)}%</span>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+                  {pgResult.intent.manifest?.allowed_actions && pgResult.intent.manifest.allowed_actions.length > 0 && (
+                    <div className="pt-3 border-t border-border/40">
+                      <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-2">Allowed Actions</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {pgResult.intent.manifest.allowed_actions.map((a: string, i: number) => (
+                          <span key={i} className="text-[11px] px-2 py-0.5 rounded-md bg-success/10 text-success font-medium">{a}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {pgResult.intent.manifest?.forbidden_actions && pgResult.intent.manifest.forbidden_actions.length > 0 && (
+                    <div className="pt-3 border-t border-border/40">
+                      <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-2">Forbidden Actions</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {pgResult.intent.manifest.forbidden_actions.map((a: string, i: number) => (
+                          <span key={i} className="text-[11px] px-2 py-0.5 rounded-md bg-destructive/10 text-destructive font-medium">{a}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {pgResult.intent.manifest?.constraints && pgResult.intent.manifest.constraints.length > 0 && (
+                    <div className="pt-3 border-t border-border/40">
+                      <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-1.5">Constraints</span>
+                      <ul className="space-y-1">
+                        {pgResult.intent.manifest.constraints.map((c: string, i: number) => (
+                          <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {pgResult.intent.fallback_used && (
+                    <div className="pt-3 border-t border-border/40">
+                      <span className="text-xs px-2 py-0.5 rounded-md bg-warning/10 text-warning font-medium">Fallback used — conservative manifest applied</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Layer 2: Action Evaluation */}
+            <div className={`bg-white rounded-xl border overflow-hidden premium-card ${
+              pgResult.action.decision === 'ALLOW' ? 'border-success/30' : pgResult.action.decision === 'DENY' ? 'border-destructive/30' : 'border-warning/30'
+            }`}>
+              <div className={`px-5 py-3.5 border-b flex items-center gap-3 ${
+                pgResult.action.decision === 'ALLOW' ? 'bg-success/[0.02]' : pgResult.action.decision === 'DENY' ? 'bg-destructive/[0.02]' : 'bg-warning/[0.02]'
+              }`}>
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{
+                  backgroundColor: pgResult.action.decision === 'ALLOW' ? 'rgba(34,197,94,0.1)' : pgResult.action.decision === 'DENY' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)'
+                }}>
+                  <span className="text-[10px] font-bold" style={{
+                    color: pgResult.action.decision === 'ALLOW' ? '#16a34a' : pgResult.action.decision === 'DENY' ? '#dc2626' : '#ca8a04'
+                  }}>2</span>
+                </div>
+                <h3 className="text-sm font-semibold text-foreground">Action Evaluation</h3>
+                <span className="ml-auto text-xs font-mono text-muted-foreground">{pgResult.action.action?.action_type || pgResult.action.action_type}</span>
+              </div>
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${decisionBadge(pgResult.action.decision).style}`}>
+                    {pgResult.action.decision}
+                  </span>
+                  <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{
+                      width: `${(pgResult.action.risk_score || 0) * 100}%`,
+                      backgroundColor: (pgResult.action.risk_score || 0) > 0.7 ? '#ef4444' : (pgResult.action.risk_score || 0) > 0.3 ? '#eab308' : '#22c55e'
+                    }} />
+                  </div>
+                  <span className="text-xs font-mono text-muted-foreground">Risk: {((pgResult.action.risk_score || 0) * 100).toFixed(0)}%</span>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Target</span>
+                    <span className="text-foreground font-mono">{pgResult.action.action?.target || pgResult.action.target || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Target Type</span>
+                    <span className="text-foreground">{pgResult.action.action?.target_type || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Blocked</span>
+                    <span className={pgResult.action.blocked ? 'text-destructive font-semibold' : 'text-success font-semibold'}>{pgResult.action.blocked ? 'Yes' : 'No'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Attack Type</span>
+                    <span className="text-foreground">{pgResult.action.attack_type || 'N/A'}</span>
                   </div>
                 </div>
-              )}
 
-              {pgResult.action.review_item_id && (
-                <div className="mt-4 pt-4 border-t border-border/40">
-                  <a href="/reviews" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors group">
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                    View in Review Queue
-                  </a>
-                </div>
-              )}
+                {pgResult.action.action?.parameters && Object.keys(pgResult.action.action.parameters).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border/40">
+                    <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider block mb-2">Lobster Trap Evidence</span>
+                    <div className="bg-secondary/30 rounded-xl p-3.5 font-mono text-xs space-y-1.5 border border-border/40">
+                      {Object.entries(pgResult.action.action.parameters).map(([key, val]: [string, any]) => (
+                        <div key={key} className="flex gap-2">
+                          <span className="text-primary shrink-0 font-medium">{key}:</span>
+                          <span className="text-foreground break-all">{typeof val === 'boolean' ? val.toString() : String(val)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {pgResult.action.review_item_id && (
+                  <div className="mt-4 pt-4 border-t border-border/40">
+                    <a href="/reviews" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors group">
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                      View in Review Queue
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Raw API Responses */}
-          <details className="bg-white rounded-xl border border-border/60 p-4 group">
-            <summary className="text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors flex items-center gap-1.5">
+          <details className="bg-white rounded-xl border border-border/60 group premium-card">
+            <summary className="flex items-center gap-2 px-5 py-3.5 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors">
               <Terminal className="w-3.5 h-3.5" />
               View Raw API Responses
               <ChevronRight className="w-3 h-3 ml-auto group-open:rotate-90 transition-transform" />
             </summary>
-            <div className="mt-4 space-y-4">
+            <div className="px-5 pb-5 space-y-4 border-t border-border/40 pt-4">
               <div>
                 <p className="text-xs text-muted-foreground mb-1.5 font-medium">POST /api/intent/extract</p>
                 <pre className="bg-[#0d1117] rounded-xl p-4 text-xs overflow-x-auto text-gray-300 leading-relaxed">{JSON.stringify(pgResult.intent, null, 2)}</pre>
