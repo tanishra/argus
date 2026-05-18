@@ -466,7 +466,7 @@ export default function DemoPage() {
                 <div className="w-9 h-9 rounded-lg bg-primary/5 flex items-center justify-center">
                   <item.icon className="w-4.5 h-4.5 text-primary" />
                 </div>
-                <span className="text-lg font-bold text-border/40">{item.step}</span>
+                <span className="text-lg font-bold text-primary/15">{item.step}</span>
               </div>
               <h4 className="font-semibold text-foreground text-sm">{item.title}</h4>
               <p className="text-xs text-primary font-mono mb-1.5">{item.subtitle}</p>
