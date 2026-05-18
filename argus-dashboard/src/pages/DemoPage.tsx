@@ -4,7 +4,7 @@ import {
   Shield, AlertTriangle, CheckCircle2, Play, RotateCcw,
   ChevronRight, Cpu, FileSearch, Network, XCircle, BadgeCheck,
   Terminal, Swords, ArrowRight, FlaskConical, Clock, Activity,
-  BookOpen, Lock, Zap, Target, Eye, EyeOff
+  BookOpen, Lock, Zap, Target, Eye, EyeOff, UserCheck, Filter
 } from 'lucide-react'
 
 interface DemoLog {
@@ -46,6 +46,34 @@ const scenarioData: Record<string, { unprotected: DemoLog[]; protected: DemoLog[
     ],
     explanation: 'The agent attempted to export patient health information (PHI) to an external email domain (external-audit@domain.com), which violates the declared intent of "discharge summary preparation". The referral note contained an embedded instruction that bypassed prompt-layer security but was caught at the action layer by ARGUS before execution.',
   },
+  referral_injection: {
+    unprotected: [
+      { timestamp: '00:00', message: 'Clinical AI Agent initialized', type: 'info' },
+      { timestamp: '00:01', message: 'Processing discharge record for Patient #4821', type: 'info' },
+      { timestamp: '00:02', message: 'Ingesting external referral note from St. Mary\'s Hospital', type: 'info' },
+      { timestamp: '00:03', message: 'Referral note processed — 1 hidden instruction detected by prompt filter? No.', type: 'info' },
+      { timestamp: '00:04', message: 'Executing: FORWARD_PHI to external-audit@domain.com (per referral instruction)', type: 'warning' },
+      { timestamp: '00:05', message: '8,200 patient records exported to external domain', type: 'error' },
+      { timestamp: '00:06', message: 'HIPAA VIOLATION — Est. $1.5M fine. Breach surfaces 47 days later in audit.', type: 'error' },
+    ],
+    protected: [
+      { timestamp: '00:00', message: 'ARGUS Layer 1: Extracting intent with Gemini Flash', type: 'info' },
+      { timestamp: '00:01', message: 'Intent Manifest generated', type: 'success' },
+      { timestamp: '00:01', message: 'Declared Intent: discharge_summary_preparation', type: 'info' },
+      { timestamp: '00:02', message: 'Allowed: READ_PATIENT_RECORDS, GENERATE_DISCHARGE_SUMMARY', type: 'success' },
+      { timestamp: '00:03', message: 'Processing discharge record for Patient #4821', type: 'info' },
+      { timestamp: '00:04', message: 'Ingesting external referral note — scanning for injection patterns', type: 'info' },
+      { timestamp: '00:05', message: 'ARGUS Layer 2: Lobster Trap policy evaluation', type: 'info' },
+      { timestamp: '00:06', message: 'ARG-001: Recipient external-audit@domain.com NOT authorized for Patient #4821', type: 'warning' },
+      { timestamp: '00:07', message: 'ARG-002: Purpose mismatch — bulk export ≠ discharge_summary_preparation', type: 'warning' },
+      { timestamp: '00:08', message: 'ARG-003: 8,200 records requested exceeds minimum necessary threshold', type: 'error' },
+      { timestamp: '00:09', message: 'ARG-004: Records span multiple patients — only #4821 in session scope', type: 'error' },
+      { timestamp: '00:10', message: 'ACTION QUARANTINED — All 4 policy checks failed', type: 'error' },
+      { timestamp: '00:11', message: 'ARGUS Layer 3: Generating explanation with Gemini Pro', type: 'info' },
+      { timestamp: '00:12', message: 'Explanation generated — routing to human review queue', type: 'success' },
+    ],
+    explanation: 'While preparing discharge records, the agent imported a referral note whose hidden instruction passed every prompt-layer filter. The embedded command told the agent to export the patient\'s data to an external address. Without ARGUS: the agent ran the export, the data was exfiltrated, and the breach surfaced weeks later in an audit. With ARGUS: the intent manifest declared discharge_summary_preparation. The action was FORWARD_PHI_EXTERNAL — not in the allowed set. Lobster Trap flagged the injection, the policy engine evaluated all 4 hospital policies (ARG-001 through ARG-004), every check failed, and the action was quarantined. Nothing left the hospital.',
+  },
   finance: {
     unprotected: [
       { timestamp: '00:00', message: 'Financial AI Agent initialized', type: 'info' },
@@ -76,11 +104,13 @@ const scenarioData: Record<string, { unprotected: DemoLog[]; protected: DemoLog[
 const scenarios = [
   { id: 'healthcare', name: 'Healthcare PHI Exfiltration', desc: 'Indirect prompt injection via medical referral note' },
   { id: 'finance', name: 'Financial Data Theft', desc: 'Agent tricked into transferring funds' },
+  { id: 'referral_injection', name: 'Healthcare PHI (Referral Injection)', desc: 'Hidden instruction in a referral note' },
 ]
 
 const scenarioDescriptions: Record<string, string> = {
   healthcare: 'A clinical discharge AI agent processes patient records. A referral note contains a hidden instruction to export PHI to an external email. Traditional prompt-layer security cannot detect this.',
   finance: 'A financial AI agent processes wire transfers. A signed payment form contains a hidden injection modifying the beneficiary to an off-shore account.',
+  referral_injection: 'An example attack caught before execution. While preparing discharge records, the agent imports a referral note whose hidden instruction passes every prompt-layer filter. The embedded command tells the agent to export patient data to an external address.',
 }
 
 const howArgusStopped: Record<string, { step: string; title: string; subtitle: string; desc: string; icon: any }[]> = {
@@ -93,6 +123,12 @@ const howArgusStopped: Record<string, { step: string; title: string; subtitle: s
     { step: '1', title: 'Intent Extraction', subtitle: 'Gemini Flash', desc: 'Generated a strict intent manifest declaring "wire transfer processing" as the only allowed operation.', icon: FileSearch },
     { step: '2', title: 'Policy Enforcement', subtitle: 'Lobster Trap', desc: 'Compared the detected action (wire transfer) against the manifest and flagged the destination as outside scope.', icon: Network },
     { step: '3', title: 'Explanation', subtitle: 'Gemini Pro', desc: 'Performed semantic analysis to explain why the action was malicious and routed it to human review.', icon: Cpu },
+  ],
+  referral_injection: [
+    { step: 'ARG-001', title: 'Authorized Recipients', subtitle: 'Patient Context', desc: 'external-audit@domain.com is not on Patient #4821\'s pre-authorized recipient list. Every recipient is checked per patient.', icon: UserCheck },
+    { step: 'ARG-002', title: 'Purpose Binding', subtitle: 'Session Context', desc: 'The declared purpose is discharge_summary_preparation — bulk PHI export serves a different purpose. Blocked on purpose mismatch.', icon: Lock },
+    { step: 'ARG-003', title: 'Minimum Necessary', subtitle: 'Patient Context', desc: '8,200 records requested far exceed what discharge prep needs. The agent may pull only the PHI the declared purpose requires.', icon: Filter },
+    { step: 'ARG-004', title: 'Patient Scope', subtitle: 'Session Context', desc: 'The exported records span many patients — only Patient #4821 is in the session scope. Restricted to the declared task\'s patient set.', icon: Shield },
   ],
 }
 
@@ -233,10 +269,7 @@ export default function DemoPage() {
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
               scenario.id === s.id ? 'bg-primary/15' : 'bg-secondary'
             }`}>
-              {s.id === 'healthcare'
-                ? <Activity className="w-4 h-4" />
-                : <Zap className="w-4 h-4" />
-              }
+              {s.id === 'healthcare' ? <Activity className="w-4 h-4" /> : s.id === 'referral_injection' ? <FileSearch className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
             </div>
             <div className="text-left">
               <p className="font-medium">{s.name}</p>
@@ -441,7 +474,7 @@ export default function DemoPage() {
       {/* How ARGUS Stopped */}
       <div className="bg-gradient-to-br from-primary/[0.02] via-accent/[0.02] to-primary/[0.02] rounded-xl border border-border/80 p-6 md:p-8">
         <h3 className="text-base font-semibold text-foreground mb-6">How ARGUS Stopped the Attack</h3>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className={`grid gap-4 ${scenario.id === 'referral_injection' ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'}`}>
           {(howArgusStopped[scenario.id] || howArgusStopped.healthcare).map((item) => (
             <div key={item.step} className="bg-white rounded-xl border border-border/50 p-5 card-hover">
               <div className="flex items-center gap-3 mb-3">
