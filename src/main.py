@@ -300,7 +300,7 @@ async def evaluate_action(request: Request, action_req: ActionRequest, _: bool =
         )
 
         # Add to review queue
-        review_item = _review_queue.add_item(
+        review_item = await _review_queue.add_item(
             manifest=manifest,
             detected_action=action,
             evaluation=evaluation,
@@ -310,7 +310,8 @@ async def evaluate_action(request: Request, action_req: ActionRequest, _: bool =
         )
 
         response["review_item_id"] = review_item.id
-        response["queue_position"] = len(_review_queue.get_pending())
+        pending = await _review_queue.get_pending()
+        response["queue_position"] = len(pending)
 
         await event_bus.publish_event("alert", {
             "severity": "high",
@@ -473,18 +474,18 @@ async def get_lightweight_stats():
 @app.get("/api/reviews")
 async def get_pending_reviews(limit: Optional[int] = None, _: bool = Depends(require_engine_ready)):
     """Get pending review items."""
-    items = _review_queue.get_pending(limit)
+    items = await _review_queue.get_pending(limit)
     return {
         "items": [item.to_dict() for item in items],
         "total": len(items),
-        "statistics": _review_queue.get_statistics()
+        "statistics": await _review_queue.get_statistics()
     }
 
 
 @app.get("/api/reviews/{item_id}")
 async def get_review_item(item_id: str):
     """Get specific review item."""
-    item = _review_queue.get_item(item_id)
+    item = await _review_queue.get_item(item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Review item not found")
     return item.to_dict()
@@ -494,7 +495,7 @@ async def get_review_item(item_id: str):
 @limiter.limit("30/minute")
 async def claim_review(request: Request, item_id: str, reviewer_id: str):
     """Claim a review item for review."""
-    item = _review_queue.claim_item(item_id, reviewer_id)
+    item = await _review_queue.claim_item(item_id, reviewer_id)
     if not item:
         raise HTTPException(status_code=400, detail="Cannot claim item")
     return item.to_dict()
@@ -504,7 +505,7 @@ async def claim_review(request: Request, item_id: str, reviewer_id: str):
 @limiter.limit("30/minute")
 async def submit_review_decision(request: Request, decision: ReviewDecision, _: bool = Depends(require_engine_ready)):
     """Submit a review decision."""
-    item = _review_queue.complete_review(
+    item = await _review_queue.complete_review(
         item_id=decision.item_id,
         reviewer_id="demo-reviewer",  # In production, from auth
         decision=decision.decision,
@@ -531,7 +532,7 @@ async def submit_review_decision(request: Request, decision: ReviewDecision, _: 
 @app.get("/api/reviews/statistics")
 async def get_review_statistics():
     """Get review queue statistics."""
-    return _review_queue.get_statistics()
+    return await _review_queue.get_statistics()
 
 
 # ============ Dashboard Real-time Endpoints ============
@@ -539,7 +540,7 @@ async def get_review_statistics():
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats():
     """Get dashboard statistics."""
-    queue_stats = _review_queue.get_statistics()
+    queue_stats = await _review_queue.get_statistics()
     c = counters.get_counters()
 
     return {
@@ -608,7 +609,7 @@ async def export_compliance_report(session_id: str, format: str = "json", _: boo
         "actions_evaluated": c.actions_today,
         "actions_blocked": c.blocked_actions,
         "actions_quarantined": c.quarantined,
-        "review_items": [item.to_dict() for item in _review_queue.get_pending()[:5]],
+        "review_items": [item.to_dict() for item in (await _review_queue.get_pending())[:5]],
         "audit_log": audit_log
     }
 

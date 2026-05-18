@@ -13,6 +13,7 @@ and policy evaluation.
 from __future__ import annotations
 
 import json
+import logging
 import time
 import os
 from dataclasses import dataclass, field
@@ -535,7 +536,7 @@ class LobsterTrapProxy:
             except Exception as e:
                 logger.warning("Failed to reach real Lobster Trap binary (%s). Falling back to simulation.", e)
 
-        return self.engine.evaluate_action(manifest, action)
+            return self.engine.evaluate_action(manifest, action)
 
     def create_detected_action(
         self,
@@ -566,6 +567,8 @@ class LobsterTrapProxy:
 
 
 # Global instance
+logger = logging.getLogger("argus.lobster_proxy")
+
 _proxy: Optional[LobsterTrapProxy] = None
 
 

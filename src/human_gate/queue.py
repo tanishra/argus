@@ -8,6 +8,7 @@ and high-risk actions that require human decision-making.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -194,8 +195,9 @@ class ReviewQueue:
         self._items: dict[str, ReviewItem] = {}
         self._pending_list: list[str] = []  # Ordered by priority/time
         self._reviewers: dict[str, dict] = {}  # reviewer_id -> metadata
+        self._lock = asyncio.Lock()
 
-    def add_item(
+    async def add_item(
         self,
         manifest: IntentManifest,
         detected_action: DetectedAction,
@@ -205,50 +207,31 @@ class ReviewQueue:
         recommended_action: str = "",
         priority: Optional[ReviewPriority] = None
     ) -> ReviewItem:
-        """
-        Add a new item to the review queue.
+        async with self._lock:
+            if priority is None:
+                priority = self._calculate_priority(evaluation)
 
-        Args:
-            manifest: Declared intent manifest
-            detected_action: Detected action requiring review
-            evaluation: Policy evaluation result
-            explanation_summary: Brief explanation
-            explanation_details: Detailed explanation
-            recommended_action: Suggested action (APPROVE/DENY/ESCALATE)
-            priority: Override priority (auto-calculated if None)
+            sla_hours = self._get_sla_hours(priority)
+            deadline = datetime.now(timezone.utc) + timedelta(hours=sla_hours)
 
-        Returns:
-            Created ReviewItem
-        """
-        # Calculate priority based on risk
-        if priority is None:
-            priority = self._calculate_priority(evaluation)
+            item = ReviewItem(
+                manifest=manifest,
+                detected_action=detected_action,
+                evaluation=evaluation,
+                priority=priority,
+                explanation_summary=explanation_summary,
+                explanation_details=explanation_details,
+                recommended_action=recommended_action,
+                deadline=deadline,
+                sla_hours=sla_hours
+            )
 
-        # Calculate deadline based on priority
-        sla_hours = self._get_sla_hours(priority)
-        deadline = datetime.now(timezone.utc) + timedelta(hours=sla_hours)
+            self._items[item.id] = item
+            self._pending_list.append(item.id)
+            self._sort_pending_list()
+            item.add_audit_entry("created", "system", "Item added to review queue")
 
-        item = ReviewItem(
-            manifest=manifest,
-            detected_action=detected_action,
-            evaluation=evaluation,
-            priority=priority,
-            explanation_summary=explanation_summary,
-            explanation_details=explanation_details,
-            recommended_action=recommended_action,
-            deadline=deadline,
-            sla_hours=sla_hours
-        )
-
-        # Add to queue
-        self._items[item.id] = item
-        self._pending_list.append(item.id)
-        self._sort_pending_list()
-
-        # Add audit entry
-        item.add_audit_entry("created", "system", "Item added to review queue")
-
-        return item
+            return item
 
     def _calculate_priority(self, evaluation: PolicyEvaluation) -> ReviewPriority:
         """Calculate priority based on policy evaluation."""
@@ -299,144 +282,142 @@ class ReviewQueue:
 
         self._pending_list.sort(key=sort_key)
 
-    def get_pending(self, limit: Optional[int] = None) -> list[ReviewItem]:
+    async def get_pending(self, limit: Optional[int] = None) -> list[ReviewItem]:
         """Get pending items, optionally limited."""
-        items = [self._items[i] for i in self._pending_list
-                 if self._items[i].status == ReviewStatus.PENDING]
-        return items[:limit] if limit else items
+        async with self._lock:
+            items = [self._items[i] for i in self._pending_list
+                     if self._items[i].status == ReviewStatus.PENDING]
+            return items[:limit] if limit else items
 
-    def get_item(self, item_id: str) -> Optional[ReviewItem]:
+    async def get_item(self, item_id: str) -> Optional[ReviewItem]:
         """Get specific review item by ID."""
-        return self._items.get(item_id)
+        async with self._lock:
+            return self._items.get(item_id)
 
-    def claim_item(self, item_id: str, reviewer_id: str) -> Optional[ReviewItem]:
+    async def claim_item(self, item_id: str, reviewer_id: str) -> Optional[ReviewItem]:
         """Claim an item for review."""
-        item = self._items.get(item_id)
-        if not item:
-            return None
+        async with self._lock:
+            item = self._items.get(item_id)
+            if not item:
+                return None
 
-        if item.status != ReviewStatus.PENDING:
-            return None
+            if item.status != ReviewStatus.PENDING:
+                return None
 
-        item.status = ReviewStatus.IN_REVIEW
-        item.assigned_reviewer = reviewer_id
-        item.add_audit_entry("claimed", reviewer_id)
+            item.status = ReviewStatus.IN_REVIEW
+            item.assigned_reviewer = reviewer_id
+            item.add_audit_entry("claimed", reviewer_id)
 
-        return item
+            return item
 
-    def complete_review(
+    async def complete_review(
         self,
         item_id: str,
         reviewer_id: str,
         decision: str,
         notes: str = ""
     ) -> Optional[ReviewItem]:
-        """
-        Complete a review with decision.
+        async with self._lock:
+            item = self._items.get(item_id)
+            if not item:
+                return None
 
-        Args:
-            item_id: ID of the review item
-            reviewer_id: ID of the reviewer
-            decision: APPROVED, DENIED, or ESCALATED
-            notes: Optional reviewer notes
+            if item.status != ReviewStatus.IN_REVIEW:
+                return None
 
-        Returns:
-            Updated ReviewItem or None if not found
-        """
-        item = self._items.get(item_id)
-        if not item:
-            return None
+            if item.assigned_reviewer and reviewer_id != item.assigned_reviewer:
+                return None
 
-        # Update status
-        if decision == "APPROVED":
-            item.status = ReviewStatus.APPROVED
-        elif decision == "DENIED":
-            item.status = ReviewStatus.DENIED
-        else:
-            item.status = ReviewStatus.ESCALATED
+            if decision == "APPROVED":
+                item.status = ReviewStatus.APPROVED
+            elif decision == "DENIED":
+                item.status = ReviewStatus.DENIED
+            else:
+                item.status = ReviewStatus.ESCALATED
 
-        item.decision = decision
-        item.reviewer_notes = notes
-        item.reviewed_by = reviewer_id
-        item.reviewed_at = datetime.now(timezone.utc)
+            item.decision = decision
+            item.reviewer_notes = notes
+            item.reviewed_by = reviewer_id
+            item.reviewed_at = datetime.now(timezone.utc)
 
-        # Add to audit log
-        item.add_audit_entry("completed", reviewer_id, f"Decision: {decision}")
+            item.add_audit_entry("completed", reviewer_id, f"Decision: {decision}")
 
-        # Remove from pending list
-        if item_id in self._pending_list:
-            self._pending_list.remove(item_id)
+            if item_id in self._pending_list:
+                self._pending_list.remove(item_id)
 
-        return item
+            return item
 
-    def escalate(self, item_id: str, reason: str) -> Optional[ReviewItem]:
+    async def escalate(self, item_id: str, reason: str) -> Optional[ReviewItem]:
         """Escalate an item to higher priority."""
-        item = self._items.get(item_id)
-        if not item:
-            return None
+        async with self._lock:
+            item = self._items.get(item_id)
+            if not item:
+                return None
 
-        # Increase priority
-        if item.priority == ReviewPriority.LOW:
-            item.priority = ReviewPriority.NORMAL
-        elif item.priority == ReviewPriority.NORMAL:
-            item.priority = ReviewPriority.HIGH
-        elif item.priority == ReviewPriority.HIGH:
-            item.priority = ReviewPriority.URGENT
-        else:
-            item.priority = ReviewPriority.CRITICAL
+            if item.priority == ReviewPriority.LOW:
+                item.priority = ReviewPriority.NORMAL
+            elif item.priority == ReviewPriority.NORMAL:
+                item.priority = ReviewPriority.HIGH
+            elif item.priority == ReviewPriority.HIGH:
+                item.priority = ReviewPriority.URGENT
+            else:
+                item.priority = ReviewPriority.CRITICAL
 
-        item.status = ReviewStatus.ESCALATED
-        item.escalated_at = datetime.now(timezone.utc)
-        item.add_audit_entry("escalated", "system", reason)
+            item.status = ReviewStatus.ESCALATED
+            item.escalated_at = datetime.now(timezone.utc)
+            item.add_audit_entry("escalated", "system", reason)
 
-        # Re-sort pending list
-        self._sort_pending_list()
+            if item_id in self._pending_list:
+                self._pending_list.remove(item_id)
 
-        return item
+            return item
 
-    def get_statistics(self) -> dict:
+    async def get_statistics(self) -> dict:
         """Get queue statistics."""
-        total = len(self._items)
-        pending = sum(1 for i in self._items.values() if i.status == ReviewStatus.PENDING)
-        in_review = sum(1 for i in self._items.values() if i.status == ReviewStatus.IN_REVIEW)
-        approved = sum(1 for i in self._items.values() if i.status == ReviewStatus.APPROVED)
-        denied = sum(1 for i in self._items.values() if i.status == ReviewStatus.DENIED)
-        overdue = sum(1 for i in self._items.values() if i.is_overdue())
+        async with self._lock:
+            total = len(self._items)
+            pending = sum(1 for i in self._items.values() if i.status == ReviewStatus.PENDING)
+            in_review = sum(1 for i in self._items.values() if i.status == ReviewStatus.IN_REVIEW)
+            approved = sum(1 for i in self._items.values() if i.status == ReviewStatus.APPROVED)
+            denied = sum(1 for i in self._items.values() if i.status == ReviewStatus.DENIED)
+            overdue = sum(1 for i in self._items.values() if i.is_overdue())
 
-        return {
-            "total_items": total,
-            "pending": pending,
-            "in_review": in_review,
-            "approved": approved,
-            "denied": denied,
-            "overdue": overdue,
-            "pending_list": self._pending_list.copy()
-        }
+            return {
+                "total_items": total,
+                "pending": pending,
+                "in_review": in_review,
+                "approved": approved,
+                "denied": denied,
+                "overdue": overdue,
+                "pending_list": self._pending_list.copy()
+            }
 
-    def get_overdue_items(self) -> list[ReviewItem]:
+    async def get_overdue_items(self) -> list[ReviewItem]:
         """Get all overdue items."""
-        return [item for item in self._items.values() if item.is_overdue()]
+        async with self._lock:
+            return [item for item in self._items.values() if item.is_overdue()]
 
-    def export_for_compliance(self, item_id: str) -> Optional[dict]:
+    async def export_for_compliance(self, item_id: str) -> Optional[dict]:
         """Export item data for compliance reporting."""
-        item = self._items.get(item_id)
-        if not item:
-            return None
+        async with self._lock:
+            item = self._items.get(item_id)
+            if not item:
+                return None
 
-        return {
-            "review_id": item.id,
-            "timestamp": item.created_at.isoformat(),
-            "intent": item.manifest.declared_intent.value if item.manifest else None,
-            "action": item.detected_action.action_type.value if item.detected_action else None,
-            "action_target": item.detected_action.target if item.detected_action else None,
-            "decision": item.decision,
-            "decision_made_by": item.reviewed_by,
-            "decision_timestamp": item.reviewed_at.isoformat() if item.reviewed_at else None,
-            "risk_score": item.evaluation.risk_score if item.evaluation else None,
-            "reasoning": item.explanation_details,
-            "reviewer_notes": item.reviewer_notes,
-            "audit_log": item.audit_log
-        }
+            return {
+                "review_id": item.id,
+                "timestamp": item.created_at.isoformat(),
+                "intent": item.manifest.declared_intent.value if item.manifest else None,
+                "action": item.detected_action.action_type.value if item.detected_action else None,
+                "action_target": item.detected_action.target if item.detected_action else None,
+                "decision": item.decision,
+                "decision_made_by": item.reviewed_by,
+                "decision_timestamp": item.reviewed_at.isoformat() if item.reviewed_at else None,
+                "risk_score": item.evaluation.risk_score if item.evaluation else None,
+                "reasoning": item.explanation_details,
+                "reviewer_notes": item.reviewer_notes,
+                "audit_log": item.audit_log
+            }
 
 
 class ReviewerPool:

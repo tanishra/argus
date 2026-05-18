@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -128,8 +129,10 @@ class GeminiProClient:
                 if attempt < self.gemini_config.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
-                raise RuntimeError(f"Gemini Pro API call failed after {self.config.max_retries} retries")
+                raise RuntimeError(f"Gemini Pro API call failed after {self.gemini_config.max_retries} attempts")
 
+
+logger = logging.getLogger("argus.explanation_engine")
 
 class ExplanationEngine:
     """
