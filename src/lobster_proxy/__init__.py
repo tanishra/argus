@@ -11,7 +11,6 @@ from .engine import (
     LobsterTrapProxy,
     DetectedAction,
     PolicyEvaluation,
-    PolicyViolation,
     Decision,
     RiskThreshold,
     get_proxy
@@ -22,7 +21,6 @@ __all__ = [
     "LobsterTrapProxy",
     "DetectedAction",
     "PolicyEvaluation",
-    "PolicyViolation",
     "Decision",
     "RiskThreshold",
     "get_proxy"

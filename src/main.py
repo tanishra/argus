@@ -602,9 +602,10 @@ async def export_compliance_report(session_id: str, format: str = "json", _: boo
     
     c = await counters.get_counters()
     audit_log = await audit.get_recent_events(limit=50)
-    pending_items = await _review_queue.get_pending()
+    queue_stats = await _review_queue.get_statistics()
+    completed_items = await _review_queue.get_completed(limit=10)
     review_compliance = []
-    for item in pending_items[:5]:
+    for item in completed_items:
         compliance = await _review_queue.export_for_compliance(item.id)
         if compliance:
             review_compliance.append(compliance)
@@ -616,7 +617,8 @@ async def export_compliance_report(session_id: str, format: str = "json", _: boo
         "actions_evaluated": c.actions_today,
         "actions_blocked": c.blocked_actions,
         "actions_quarantined": c.quarantined,
-        "review_items": [item.to_dict() for item in pending_items[:5]],
+        "actions_approved": queue_stats.get("approved", 0),
+        "actions_denied": queue_stats.get("denied", 0),
         "review_compliance": review_compliance,
         "audit_log": audit_log
     }

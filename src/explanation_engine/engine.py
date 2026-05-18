@@ -42,19 +42,6 @@ class MismatchExplanation:
     raw_model_output: Optional[str] = None
 
 
-@dataclass
-class ComplianceSummary:
-    """Summary for compliance documentation."""
-    timestamp: datetime
-    session_id: str
-    intent: str
-    action_taken: str
-    decision: str
-    reasoning: str
-    reviewer: Optional[str] = None
-    review_timestamp: Optional[datetime] = None
-
-
 class GeminiProClient:
     """Async client for Gemini Pro API calls."""
 
@@ -376,24 +363,8 @@ class ExplanationEngine:
                 max_tokens=256
             )
         except Exception:
+            logger.warning("Fallback to template explanation for '%s' on '%s'", action_type, target)
             return f"Action '{action_type}' targeting '{target}' flagged: {reason}"
-
-    def create_compliance_summary(
-        self,
-        manifest: IntentManifest,
-        action: DetectedAction,
-        evaluation: PolicyEvaluation,
-        explanation: MismatchExplanation
-    ) -> ComplianceSummary:
-        """Create compliance-ready summary for audit trail."""
-        return ComplianceSummary(
-            timestamp=datetime.now(timezone.utc),
-            session_id=manifest.session_id,
-            intent=manifest.declared_intent.value,
-            action_taken=f"{action.action_type.value} on {action.target}",
-            decision=evaluation.decision.value,
-            reasoning=explanation.detailed_reason
-        )
 
 
 class SyncExplanationEngine:

@@ -9,8 +9,7 @@ for intent-action mismatches using Gemini Pro.
 from .engine import (
     ExplanationEngine,
     SyncExplanationEngine,
-    MismatchExplanation,
-    ComplianceSummary
+    MismatchExplanation
 )
 
 from .config import get_config, get_prompt_config, ExplanationEngineConfig
@@ -20,7 +19,6 @@ __all__ = [
     "ExplanationEngine",
     "SyncExplanationEngine",
     "MismatchExplanation",
-    "ComplianceSummary",
     # Config
     "get_config",
     "get_prompt_config",

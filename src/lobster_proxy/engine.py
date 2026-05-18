@@ -109,16 +109,6 @@ class PolicyEvaluation:
         return self.decision in [Decision.HUMAN_REVIEW, Decision.QUARANTINE]
 
 
-@dataclass
-class PolicyViolation:
-    """Represents a violation found during policy evaluation."""
-    violation_type: str
-    severity: str  # low, medium, high, critical
-    description: str
-    evidence: dict[str, Any] = field(default_factory=dict)
-    matched_rule: Optional[str] = None
-
-
 class LobsterTrapEngine:
     """
     Policy enforcement engine using Lobster Trap principles.

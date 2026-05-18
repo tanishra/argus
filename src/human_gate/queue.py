@@ -392,6 +392,14 @@ class ReviewQueue:
                 "pending_list": self._pending_list.copy()
             }
 
+    async def get_completed(self, limit: Optional[int] = None) -> list[ReviewItem]:
+        """Get completed (approved/denied/escalated) items, optionally limited."""
+        async with self._lock:
+            decided = {ReviewStatus.APPROVED, ReviewStatus.DENIED, ReviewStatus.ESCALATED}
+            items = [i for i in self._items.values() if i.status in decided]
+            items.sort(key=lambda i: i.reviewed_at or i.created_at, reverse=True)
+            return items[:limit] if limit else items
+
     async def get_overdue_items(self) -> list[ReviewItem]:
         """Get all overdue items."""
         async with self._lock:
@@ -420,66 +428,8 @@ class ReviewQueue:
             }
 
 
-class ReviewerPool:
-    """Manages pool of available reviewers."""
-
-    def __init__(self):
-        self._reviewers: dict[str, dict] = {}
-
-    def add_reviewer(
-        self,
-        reviewer_id: str,
-        name: str,
-        email: str,
-        role: str = "analyst"
-    ) -> None:
-        """Add a reviewer to the pool."""
-        self._reviewers[reviewer_id] = {
-            "id": reviewer_id,
-            "name": name,
-            "email": email,
-            "role": role,
-            "active": True,
-            "current_load": 0,
-            "max_load": 10
-        }
-
-    def remove_reviewer(self, reviewer_id: str) -> bool:
-        """Remove a reviewer from the pool."""
-        if reviewer_id in self._reviewers:
-            self._reviewers[reviewer_id]["active"] = False
-            return True
-        return False
-
-    def get_available_reviewer(self) -> Optional[str]:
-        """Get reviewer with lowest current load."""
-        available = [
-            r for r in self._reviewers.values()
-            if r["active"] and r["current_load"] < r["max_load"]
-        ]
-
-        if not available:
-            return None
-
-        return min(available, key=lambda r: r["current_load"])["id"]
-
-    def increment_load(self, reviewer_id: str) -> None:
-        """Increment current load for reviewer."""
-        if reviewer_id in self._reviewers:
-            self._reviewers[reviewer_id]["current_load"] += 1
-
-    def decrement_load(self, reviewer_id: str) -> None:
-        """Decrement current load for reviewer."""
-        if reviewer_id in self._reviewers:
-            self._reviewers[reviewer_id]["current_load"] = max(
-                0,
-                self._reviewers[reviewer_id]["current_load"] - 1
-            )
-
-
-# Global instances
+# Global instance
 _queue: Optional[ReviewQueue] = None
-_reviewer_pool: Optional[ReviewerPool] = None
 
 
 def get_queue() -> ReviewQueue:
@@ -488,11 +438,3 @@ def get_queue() -> ReviewQueue:
     if _queue is None:
         _queue = ReviewQueue()
     return _queue
-
-
-def get_reviewer_pool() -> ReviewerPool:
-    """Get or create global reviewer pool instance."""
-    global _reviewer_pool
-    if _reviewer_pool is None:
-        _reviewer_pool = ReviewerPool()
-    return _reviewer_pool
