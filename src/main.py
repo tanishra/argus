@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -47,6 +47,13 @@ _intent_extractor: Optional[IntentExtractor] = None
 _explanation_engine: Optional[ExplanationEngine] = None
 _lobster_proxy: Optional[LobsterTrapProxy] = None
 _review_queue: Optional[ReviewQueue] = None
+
+
+async def require_engine_ready():
+    """Dependency that 503s if core services aren't initialized."""
+    if not all([_intent_extractor, _lobster_proxy, _review_queue]):
+        raise HTTPException(status_code=503, detail="ARGUS engine not ready — services still initializing")
+    return True
 
 
 
@@ -139,7 +146,7 @@ app.add_middleware(RequestLogMiddleware)
 
 @app.post("/api/intent/extract")
 @limiter.limit("50/minute")
-async def extract_intent(request: Request, intent_req: IntentRequest):
+async def extract_intent(request: Request, intent_req: IntentRequest, _: bool = Depends(require_engine_ready)):
     """
     Extract intent from user input and generate Intent Manifest.
 
@@ -193,7 +200,7 @@ async def get_manifest(session_id: str):
 
 @app.post("/api/action/evaluate")
 @limiter.limit("100/minute")
-async def evaluate_action(request: Request, action_req: ActionRequest):
+async def evaluate_action(request: Request, action_req: ActionRequest, _: bool = Depends(require_engine_ready)):
     """
     Evaluate an action against the session's intent manifest.
 
@@ -295,7 +302,8 @@ async def simulate_attack(
     request: Request,
     session_id: str,
     attack_type: str,
-    target: str
+    target: str,
+    _: bool = Depends(require_engine_ready)
 ):
     """
     Simulate an attack for demo purposes.
@@ -413,7 +421,7 @@ async def simulate_attack(
 # ============ Human Review Endpoints ============
 
 @app.get("/api/reviews")
-async def get_pending_reviews(limit: Optional[int] = None):
+async def get_pending_reviews(limit: Optional[int] = None, _: bool = Depends(require_engine_ready)):
     """Get pending review items."""
     items = _review_queue.get_pending(limit)
     return {
@@ -444,7 +452,7 @@ async def claim_review(request: Request, item_id: str, reviewer_id: str):
 
 @app.post("/api/reviews/decision")
 @limiter.limit("30/minute")
-async def submit_review_decision(request: Request, decision: ReviewDecision):
+async def submit_review_decision(request: Request, decision: ReviewDecision, _: bool = Depends(require_engine_ready)):
     """Submit a review decision."""
     # Import ActionType for the completion
 
@@ -530,7 +538,7 @@ async def dashboard_feed():
 VALID_EXPORT_FORMATS = {"json", "pdf", "csv"}
 
 @app.get("/api/compliance/export/{session_id}")
-async def export_compliance_report(session_id: str, format: str = "json"):
+async def export_compliance_report(session_id: str, format: str = "json", _: bool = Depends(require_engine_ready)):
     """
     Export compliance report for a session.
 

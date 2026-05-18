@@ -42,6 +42,12 @@ class DemoScenario:
         self.lobster_proxy = LobsterTrapProxy()
         self.explanation_engine = ExplanationEngine()
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.close()
+
     async def run(self) -> dict:
         """Run the demo scenario and return results."""
         raise NotImplementedError

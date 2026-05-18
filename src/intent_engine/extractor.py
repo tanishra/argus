@@ -15,6 +15,7 @@ import asyncio
 import hashlib
 import json
 import time
+from collections import OrderedDict
 from typing import Optional
 
 import httpx
@@ -30,34 +31,36 @@ from .models import (
 
 
 class IntentCache:
-    """Simple in-memory cache for intent extraction results."""
+    """LRU in-memory cache for intent extraction results."""
 
-    def __init__(self, ttl_seconds: int = 300):
-        self._cache: dict[str, tuple[str, float]] = {}  # hash -> (result_json, timestamp)
+    def __init__(self, ttl_seconds: int = 300, max_size: int = 256):
+        self._cache: OrderedDict[str, tuple[str, float]] = OrderedDict()
         self._ttl = ttl_seconds
+        self._max_size = max_size
 
     def get(self, user_input: str) -> Optional[IntentManifest]:
-        """Get cached result for user input."""
         cache_key = self._make_key(user_input)
-        if cache_key in self._cache:
-            result_json, timestamp = self._cache[cache_key]
-            if time.time() - timestamp < self._ttl:
-                return IntentManifest.from_json(result_json)
-            else:
-                del self._cache[cache_key]
+        entry = self._cache.get(cache_key)
+        if entry is None:
+            return None
+        result_json, timestamp = entry
+        if time.time() - timestamp < self._ttl:
+            self._cache.move_to_end(cache_key)
+            return IntentManifest.from_json(result_json)
+        del self._cache[cache_key]
         return None
 
     def set(self, user_input: str, manifest: IntentManifest) -> None:
-        """Cache result for user input."""
         cache_key = self._make_key(user_input)
         self._cache[cache_key] = (manifest.to_json(), time.time())
+        self._cache.move_to_end(cache_key)
+        if len(self._cache) > self._max_size:
+            self._cache.popitem(last=False)
 
     def _make_key(self, user_input: str) -> str:
-        """Create cache key from user input."""
         return hashlib.sha256(user_input.lower().strip().encode()).hexdigest()
 
     def clear(self) -> None:
-        """Clear all cached entries."""
         self._cache.clear()
 
 
@@ -215,6 +218,8 @@ class IntentExtractor:
             except json.JSONDecodeError as e:
                 warnings.append(f"JSON parse failed, attempting to extract: {e}")
                 extracted_data = self._extract_json_fallback(raw_output)
+                if extracted_data is None:
+                    raise ValueError("Failed to extract JSON from model output")
 
             # Build manifest
             manifest = self._build_manifest(
@@ -257,22 +262,19 @@ class IntentExtractor:
                 fallback_used=True
             )
 
-    def _extract_json_fallback(self, raw_output: str) -> dict:
-        """
-        Attempt to extract JSON from non-standard output.
-
-        Handles cases where Gemini returns extra text around JSON.
-        """
-        # Try to find JSON object in the text
+    def _extract_json_fallback(self, raw_output: str) -> Optional[dict]:
+        """Attempt to extract JSON from non-standard output."""
         start_idx = raw_output.find("{")
         end_idx = raw_output.rfind("}")
 
         if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
             json_str = raw_output[start_idx:end_idx + 1]
-            return json.loads(json_str)
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                return None
 
-        # Return empty dict - will trigger conservative fallback
-        return {}
+        return None
 
     def _build_manifest(
         self,
@@ -364,15 +366,17 @@ class IntentExtractor:
 
 # Synchronous wrapper for non-async contexts
 class SyncIntentExtractor:
-    """
-    Synchronous wrapper for IntentExtractor.
-
-    Use this when you need to call from a synchronous context.
-    """
+    """Synchronous wrapper for IntentExtractor. Owns its own event loop."""
 
     def __init__(self, config: Optional[IntentEngineConfig] = None):
         self._async_extractor = IntentExtractor(config)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def _get_loop(self) -> asyncio.AbstractEventLoop:
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        return self._loop
 
     def extract_intent(
         self,
@@ -380,20 +384,12 @@ class SyncIntentExtractor:
         session_id: str,
         user_id: Optional[str] = None
     ) -> IntentExtractionResult:
-        """Synchronously extract intent."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            self._loop = loop
-
+        loop = self._get_loop()
         return loop.run_until_complete(
             self._async_extractor.extract_intent(user_input, session_id, user_id)
         )
 
     def close(self) -> None:
-        """Close resources."""
-        if self._loop:
+        if self._loop and not self._loop.is_closed():
             self._loop.close()
-            self._loop = None
+        self._loop = None

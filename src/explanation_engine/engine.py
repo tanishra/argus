@@ -2,7 +2,7 @@
 Explanation Engine
 =================
 
-Layer 3B of ARGUS architecture - generates human-readable explanations
+Layer 3 of ARGUS architecture - generates human-readable explanations
 for intent-action mismatches using Gemini Pro deep reasoning.
 """
 
@@ -393,10 +393,17 @@ class ExplanationEngine:
 
 
 class SyncExplanationEngine:
-    """Synchronous wrapper for ExplanationEngine."""
+    """Synchronous wrapper for ExplanationEngine. Owns its own event loop."""
 
     def __init__(self, config: Optional[ExplanationEngineConfig] = None):
         self._async_engine = ExplanationEngine(config)
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def _get_loop(self) -> asyncio.AbstractEventLoop:
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        return self._loop
 
     def explain_mismatch(
         self,
@@ -405,24 +412,16 @@ class SyncExplanationEngine:
         evaluation: PolicyEvaluation
     ) -> MismatchExplanation:
         """Synchronously explain mismatch."""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError("Loop closed")
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        loop = self._get_loop()
         return loop.run_until_complete(
             self._async_engine.explain_mismatch(manifest, detected_action, evaluation)
         )
 
     def close(self) -> None:
-        """Close resources."""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError("Loop closed")
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._async_engine.close())
+        """Close the async engine and the dedicated event loop."""
+        if self._loop and not self._loop.is_closed():
+            try:
+                self._loop.run_until_complete(self._async_engine.close())
+            finally:
+                self._loop.close()
+                self._loop = None
