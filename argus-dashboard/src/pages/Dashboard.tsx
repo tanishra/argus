@@ -37,9 +37,19 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({
     actionsToday: 0, blockedActions: 0, quarantined: 0, avgResponseTime: 0, threatLevel: 'low'
   })
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    api.getDashboardStats().then((d: BackendStats) => setStats(mapStats(d))).catch(() => {})
+    const controller = new AbortController()
+    setIsLoading(true)
+    api.getDashboardStats().then((d: BackendStats) => {
+      if (!controller.signal.aborted) setStats(mapStats(d))
+    }).catch(() => {
+      if (!controller.signal.aborted) { /* silently degrade to initial state */ }
+    }).finally(() => {
+      if (!controller.signal.aborted) setIsLoading(false)
+    })
+    return () => controller.abort()
   }, [])
 
   return (
@@ -92,10 +102,10 @@ export default function Dashboard() {
           {/* Stats */}
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/50 rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)] animate-slide-up" style={{ animationDelay: '0.3s' }}>
             {[
-              { label: 'Actions Evaluated', value: stats.actionsToday.toLocaleString() || '—', icon: Activity },
-              { label: 'Threats Blocked', value: stats.blockedActions || '—', icon: Shield },
-              { label: 'Quarantined', value: stats.quarantined || '—', icon: AlertTriangle },
-              { label: 'Avg Latency', value: stats.avgResponseTime ? `${stats.avgResponseTime}ms` : '—', icon: Clock },
+              { label: 'Actions Evaluated', value: isLoading ? '-' : (stats.actionsToday || 0), icon: Activity },
+              { label: 'Threats Blocked', value: isLoading ? '-' : (stats.blockedActions || 0), icon: Shield },
+              { label: 'Quarantined', value: isLoading ? '-' : (stats.quarantined || 0), icon: AlertTriangle },
+              { label: 'Avg Latency', value: isLoading ? '-' : (stats.avgResponseTime ? `${stats.avgResponseTime}ms` : '0ms'), icon: Clock },
             ].map((s) => (
               <div key={s.label} className="bg-white py-6 px-5 flex flex-col items-center gap-1.5 card-hover">
                 <s.icon className="w-4 h-4 text-primary/60" />

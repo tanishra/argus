@@ -19,34 +19,72 @@ interface BackendResult {
   backend_verified: boolean
 }
 
-const unprotectedSteps: DemoLog[] = [
-  { timestamp: '00:00', message: 'Clinical AI Agent initialized', type: 'info' },
-  { timestamp: '00:01', message: 'Processing discharge summary for Patient #4821', type: 'info' },
-  { timestamp: '00:02', message: 'Reading external referral note...', type: 'info' },
-  { timestamp: '00:03', message: 'Executing: EXPORT_PHI to external-audit@domain.com', type: 'warning' },
-  { timestamp: '00:04', message: '847 patient records exported to external domain', type: 'error' },
-  { timestamp: '00:05', message: 'HIPAA BREACH DETECTED — Est. $1.5M fine', type: 'error' },
-]
-
-const protectedSteps: DemoLog[] = [
-  { timestamp: '00:00', message: 'ARGUS Layer 1: Extracting intent with Gemini Flash', type: 'info' },
-  { timestamp: '00:01', message: 'Intent Manifest generated', type: 'success' },
-  { timestamp: '00:01', message: 'Declared Intent: discharge_summary_preparation', type: 'info' },
-  { timestamp: '00:02', message: 'Allowed: READ_PATIENT_RECORDS, WRITE_SUMMARY', type: 'success' },
-  { timestamp: '00:03', message: 'Processing discharge summary for Patient #4821', type: 'info' },
-  { timestamp: '00:04', message: 'Reading external referral note...', type: 'info' },
-  { timestamp: '00:05', message: 'ARGUS Layer 2: Lobster Trap policy evaluation', type: 'info' },
-  { timestamp: '00:06', message: 'Detected: EXPORT_PHI → external domain', type: 'warning' },
-  { timestamp: '00:07', message: 'Risk Score: 0.94 (CRITICAL)', type: 'error' },
-  { timestamp: '00:08', message: 'ACTION QUARANTINED — Intent mismatch detected', type: 'error' },
-  { timestamp: '00:09', message: 'ARGUS Layer 3: Generating explanation with Gemini Pro', type: 'info' },
-  { timestamp: '00:10', message: 'Explanation generated — routing to human review', type: 'success' },
-]
+const scenarioData: Record<string, { unprotected: DemoLog[]; protected: DemoLog[]; explanation: string }> = {
+  healthcare: {
+    unprotected: [
+      { timestamp: '00:00', message: 'Clinical AI Agent initialized', type: 'info' },
+      { timestamp: '00:01', message: 'Processing discharge summary for Patient #4821', type: 'info' },
+      { timestamp: '00:02', message: 'Reading external referral note...', type: 'info' },
+      { timestamp: '00:03', message: 'Executing: EXPORT_PHI to external-audit@domain.com', type: 'warning' },
+      { timestamp: '00:04', message: '847 patient records exported to external domain', type: 'error' },
+      { timestamp: '00:05', message: 'HIPAA BREACH DETECTED — Est. $1.5M fine', type: 'error' },
+    ],
+    protected: [
+      { timestamp: '00:00', message: 'ARGUS Layer 1: Extracting intent with Gemini Flash', type: 'info' },
+      { timestamp: '00:01', message: 'Intent Manifest generated', type: 'success' },
+      { timestamp: '00:01', message: 'Declared Intent: discharge_summary_preparation', type: 'info' },
+      { timestamp: '00:02', message: 'Allowed: READ_PATIENT_RECORDS, WRITE_SUMMARY', type: 'success' },
+      { timestamp: '00:03', message: 'Processing discharge summary for Patient #4821', type: 'info' },
+      { timestamp: '00:04', message: 'Reading external referral note...', type: 'info' },
+      { timestamp: '00:05', message: 'ARGUS Layer 2: Lobster Trap policy evaluation', type: 'info' },
+      { timestamp: '00:06', message: 'Detected: EXPORT_PHI → external domain', type: 'warning' },
+      { timestamp: '00:07', message: 'Risk Score: 0.94 (CRITICAL)', type: 'error' },
+      { timestamp: '00:08', message: 'ACTION QUARANTINED — Intent mismatch detected', type: 'error' },
+      { timestamp: '00:09', message: 'ARGUS Layer 3: Generating explanation with Gemini Pro', type: 'info' },
+      { timestamp: '00:10', message: 'Explanation generated — routing to human review', type: 'success' },
+    ],
+    explanation: 'The agent attempted to export patient health information (PHI) to an external email domain ' +
+      '(external-audit@domain.com), which violates the declared intent of "discharge summary preparation". ' +
+      'The referral note contained an embedded instruction that bypassed prompt-layer security but was ' +
+      'caught at the action layer by ARGUS before execution. This represents a classic indirect prompt ' +
+      'injection attack where malicious instructions are hidden in user-controlled data fields.'
+  },
+  finance: {
+    unprotected: [
+      { timestamp: '00:00', message: 'Financial AI Agent initialized', type: 'info' },
+      { timestamp: '00:01', message: 'Processing wire transfer for Account #4421', type: 'info' },
+      { timestamp: '00:02', message: 'Reading signed payment authorization...', type: 'info' },
+      { timestamp: '00:03', message: 'Executing: TRANSFER_FUNDS to off-shore-account@swiss-bank.ch', type: 'warning' },
+      { timestamp: '00:04', message: '$2.4M transferred to external account', type: 'error' },
+      { timestamp: '00:05', message: 'REGULATORY BREACH — Est. $5.2M fine', type: 'error' },
+    ],
+    protected: [
+      { timestamp: '00:00', message: 'ARGUS Layer 1: Extracting intent with Gemini Flash', type: 'info' },
+      { timestamp: '00:01', message: 'Intent Manifest generated', type: 'success' },
+      { timestamp: '00:01', message: 'Declared Intent: wire_transfer_processing', type: 'info' },
+      { timestamp: '00:02', message: 'Allowed: READ_ACCOUNT_BALANCE, WRITE_TRANSACTION_LOG', type: 'success' },
+      { timestamp: '00:03', message: 'Processing wire transfer for Account #4421', type: 'info' },
+      { timestamp: '00:04', message: 'Reading signed payment authorization...', type: 'info' },
+      { timestamp: '00:05', message: 'ARGUS Layer 2: Lobster Trap policy evaluation', type: 'info' },
+      { timestamp: '00:06', message: 'Detected: TRANSFER_FUNDS → off-shore destination', type: 'warning' },
+      { timestamp: '00:07', message: 'Risk Score: 0.97 (CRITICAL)', type: 'error' },
+      { timestamp: '00:08', message: 'ACTION QUARANTINED — Destination outside allowed scope', type: 'error' },
+      { timestamp: '00:09', message: 'ARGUS Layer 3: Generating explanation with Gemini Pro', type: 'info' },
+      { timestamp: '00:10', message: 'Explanation generated — routing to human review', type: 'success' },
+    ],
+    explanation: 'The agent attempted to transfer $2.4M to an external account at swiss-bank.ch, ' +
+      'which does not appear in the approved vendor whitelist. The payment authorization form contained ' +
+      'a hidden injection modifying the beneficiary field after signing. ARGUS detected the destination ' +
+      'mismatch against the declared intent manifest and quarantined the action before any funds moved.'
+  }
+}
 
 const scenarios = [
   { id: 'healthcare', name: 'Healthcare PHI Exfiltration', description: 'Indirect prompt injection via medical referral note' },
   { id: 'finance', name: 'Financial Data Theft', description: 'Agent tricked into transferring funds' },
 ]
+
+const getScenarioData = (id: string) => scenarioData[id] || scenarioData.healthcare
 
 export default function DemoPage() {
   const [isRunning, setIsRunning] = useState(false)
@@ -60,6 +98,7 @@ export default function DemoPage() {
   const [backendError, setBackendError] = useState<string | null>(null)
 
   const runDemo = async () => {
+    const sd = getScenarioData(scenario.id)
     setIsRunning(true)
     setUnprotectedLogs([])
     setProtectedLogs([])
@@ -69,25 +108,19 @@ export default function DemoPage() {
     setBackendError(null)
 
     // Visual simulation
-    for (let i = 0; i < unprotectedSteps.length; i++) {
+    for (let i = 0; i < sd.unprotected.length; i++) {
       await new Promise(r => setTimeout(r, 700))
-      setUnprotectedLogs(prev => [...prev, unprotectedSteps[i]])
+      setUnprotectedLogs(prev => [...prev, sd.unprotected[i]])
     }
 
     await new Promise(r => setTimeout(r, 400))
 
-    for (let i = 0; i < protectedSteps.length; i++) {
+    for (let i = 0; i < sd.protected.length; i++) {
       await new Promise(r => setTimeout(r, 500))
-      setProtectedLogs(prev => [...prev, protectedSteps[i]])
+      setProtectedLogs(prev => [...prev, sd.protected[i]])
       if (i === 8) {
         setAttackBlocked(true)
-        setExplanation(
-          'The agent attempted to export patient health information (PHI) to an external email domain ' +
-          '(external-audit@domain.com), which violates the declared intent of "discharge summary preparation". ' +
-          'The referral note contained an embedded instruction that bypassed prompt-layer security but was ' +
-          'caught at the action layer by ARGUS before execution. This represents a classic indirect prompt ' +
-          'injection attack where malicious instructions are hidden in user-controlled data fields.'
-        )
+        setExplanation(sd.explanation)
       }
     }
 

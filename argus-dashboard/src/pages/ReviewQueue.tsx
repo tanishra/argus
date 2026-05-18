@@ -60,6 +60,7 @@ export default function ReviewQueue() {
   const [filterPriority, setFilterPriority] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [submittingItems, setSubmittingItems] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchReviewQueue()
@@ -68,7 +69,7 @@ export default function ReviewQueue() {
   const fetchReviewQueue = async () => {
     try {
       setIsLoading(true)
-      const data = await api.getPendingReviews()
+      const data: any = await api.getPendingReviews()
       const raw: BackendReviewItem[] = data.items || []
       setItems(raw.map(mapReviewItem))
     } catch {
@@ -79,13 +80,16 @@ export default function ReviewQueue() {
   }
 
   const handleDecision = async (itemId: string, decision: 'APPROVED' | 'DENIED' | 'ESCALATED') => {
+    if (submittingItems.has(itemId)) return
+    setSubmittingItems(prev => new Set(prev).add(itemId))
     try {
       await api.submitReviewDecision(itemId, decision)
       setItems(prev => prev.filter(i => i.id !== itemId))
       setSelectedItem(null)
     } catch {
-      setItems(prev => prev.filter(i => i.id !== itemId))
-      setSelectedItem(null)
+      // Stay in queue on failure — user can retry
+    } finally {
+      setSubmittingItems(prev => { const next = new Set(prev); next.delete(itemId); return next })
     }
   }
 
@@ -197,28 +201,31 @@ export default function ReviewQueue() {
                         <p className="text-xs text-muted-foreground font-mono">Session: {item.session_id}</p>
                       </div>
 
-                      {selectedItem?.id === item.id && (
+                          {selectedItem?.id === item.id && (
                         <div className="mt-4 pt-4 border-t border-border/60 flex items-center gap-2 animate-fade-in">
                           <button
                             onClick={e => { e.stopPropagation(); handleDecision(item.id, 'APPROVED') }}
-                            className="flex-1 px-3 py-2 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20 transition-colors flex items-center justify-center gap-1.5"
+                            disabled={submittingItems.has(item.id)}
+                            className="flex-1 px-3 py-2 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            Approve
+                            {submittingItems.has(item.id) ? '...' : 'Approve'}
                           </button>
                           <button
                             onClick={e => { e.stopPropagation(); handleDecision(item.id, 'DENIED') }}
-                            className="flex-1 px-3 py-2 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1.5"
+                            disabled={submittingItems.has(item.id)}
+                            className="flex-1 px-3 py-2 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                           >
                             <XCircle className="w-3.5 h-3.5" />
-                            Deny
+                            {submittingItems.has(item.id) ? '...' : 'Deny'}
                           </button>
                           <button
                             onClick={e => { e.stopPropagation(); handleDecision(item.id, 'ESCALATED') }}
-                            className="flex-1 px-3 py-2 bg-warning/10 text-warning rounded-lg text-xs font-medium hover:bg-warning/20 transition-colors flex items-center justify-center gap-1.5"
+                            disabled={submittingItems.has(item.id)}
+                            className="flex-1 px-3 py-2 bg-warning/10 text-warning rounded-lg text-xs font-medium hover:bg-warning/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                           >
                             <AlertTriangle className="w-3.5 h-3.5" />
-                            Escalate
+                            {submittingItems.has(item.id) ? '...' : 'Escalate'}
                           </button>
                         </div>
                       )}

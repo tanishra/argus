@@ -1,10 +1,10 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import ReviewQueue from './pages/ReviewQueue'
 import CompliancePage from './pages/CompliancePage'
 import DemoPage from './pages/DemoPage'
-import { Shield, LayoutDashboard, ListChecks, FileText, PlayCircle, Menu, X } from 'lucide-react'
+import { Shield, LayoutDashboard, ListChecks, FileText, PlayCircle, Menu, X, Home } from 'lucide-react'
 
 const navItems = [
   { name: 'Overview', path: '/', icon: LayoutDashboard, label: 'Dashboard overview' },
@@ -106,6 +106,21 @@ function Navbar() {
   )
 }
 
+function NotFound() {
+  return (
+    <div className="pt-16 min-h-screen flex items-center justify-center">
+      <div className="text-center px-6">
+        <h1 className="text-6xl font-bold text-gradient mb-4">404</h1>
+        <p className="text-lg text-muted-foreground mb-6">This page doesn't exist.</p>
+        <a href="/" className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] transition-all">
+          <Home className="w-4 h-4" />
+          Back to Dashboard
+        </a>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -116,6 +131,7 @@ function App() {
           <Route path="/demo" element={<DemoPage />} />
           <Route path="/reviews" element={<ReviewQueue />} />
           <Route path="/compliance" element={<CompliancePage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
     </BrowserRouter>

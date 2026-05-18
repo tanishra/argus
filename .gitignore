@@ -156,7 +156,8 @@ Desktop.ini
 
 # Backend
 *.csv
-*.json (non-sample)
+*.json
+!sample.json
 uploads/
 temp/
 

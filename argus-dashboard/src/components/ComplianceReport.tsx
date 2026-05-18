@@ -1,4 +1,4 @@
-import { FileText, Download, CheckCircle2, Shield } from 'lucide-react'
+import { FileText, Download, CheckCircle2, Shield, AlertTriangle } from 'lucide-react'
 import { api } from '../lib/api'
 import { useState } from 'react'
 
@@ -41,13 +41,17 @@ export function ComplianceReport() {
   const [report, setReport] = useState<Report | null>(null)
   const [exporting, setExporting] = useState<string | null>(null)
 
+  const [exportError, setExportError] = useState<string | null>(null)
+
   const handleExport = async (format: string) => {
     setExporting(format)
+    setExportError(null)
     try {
-      const res: BackendReport = await api.exportComplianceReport("demo_session_001")
+      const sessionId = import.meta.env.VITE_DEMO_SESSION_ID || 'demo_session_001'
+      const res: BackendReport = await api.exportComplianceReport(sessionId)
       setReport(mapReport(res))
     } catch {
-      setReport(null)
+      setExportError('Failed to fetch compliance data from backend')
     } finally {
       setExporting(null)
     }
@@ -91,6 +95,13 @@ export function ComplianceReport() {
           </button>
         ))}
       </div>
+
+      {exportError && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-warning bg-warning/5 border border-warning/20 rounded-lg px-4 py-3">
+          <AlertTriangle className="w-4 h-4" />
+          {exportError}
+        </div>
+      )}
 
       {report && (
         <div className="mt-6 border-t border-border/60 pt-6 animate-fade-in">
