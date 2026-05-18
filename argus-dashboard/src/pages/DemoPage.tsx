@@ -427,7 +427,7 @@ export default function DemoPage() {
         <div className="bg-white rounded-xl border border-border/60 p-4">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-            Verifying with ARGUS backend...
+            Verifying with ARGUS ...
           </div>
         </div>
       )}
@@ -438,7 +438,7 @@ export default function DemoPage() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-success">Backend Verified</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                ARGUS backend confirmed: {backendResult.decision} (risk: {(backendResult.risk_score * 100).toFixed(0)}%)
+                ARGUS confirmed: {backendResult.decision} (risk: {(backendResult.risk_score * 100).toFixed(0)}%)
               </p>
             </div>
           </div>
