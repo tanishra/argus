@@ -7,6 +7,7 @@ FastAPI backend for the ARGUS pre-action authorization gateway.
 
 import asyncio
 import json
+import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
@@ -94,6 +95,38 @@ class AuditLogEntry(BaseModel):
 
 # ============ API Application ============
 
+def validate_environment():
+    """Validate required config at startup. Fail fast with clear messages."""
+    logger = logging.getLogger("argus.startup")
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key or gemini_key == "your_gemini_api_key_here":
+        logger.warning("GEMINI_API_KEY not set or still using placeholder — Gemini calls will fail")
+    elif len(gemini_key) < 10:
+        logger.warning("GEMINI_API_KEY looks too short — may be invalid")
+
+    demo_mode = os.getenv("DEMO_MODE", "true").lower() == "true"
+    if not demo_mode:
+        api_key = os.getenv("API_KEY", "")
+        if not api_key:
+            logger.warning("DEMO_MODE=false but API_KEY not set — auth will reject all requests")
+        else:
+            logger.info("API key auth enabled")
+
+    audit_path = os.getenv("AUDIT_LOG_PATH", "data/audit.log")
+    try:
+        abs_path = os.path.abspath(audit_path)
+        os.makedirs(os.path.dirname(abs_path) or ".", exist_ok=True)
+        with open(abs_path, "a"):
+            pass
+        logger.info("Audit log path: %s", abs_path)
+    except (OSError, PermissionError) as e:
+        logger.warning("Audit log path '%s' not writable: %s", audit_path, e)
+
+    logger.info("CORS origins: %s", os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"))
+    logger.info("Demo mode: %s", demo_mode)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown."""
@@ -101,6 +134,7 @@ async def lifespan(app: FastAPI):
 
     # Startup
     setup_logging()
+    validate_environment()
     _intent_extractor = IntentExtractor()
     _explanation_engine = ExplanationEngine()
     _lobster_proxy = LobsterTrapProxy()
@@ -219,8 +253,13 @@ async def evaluate_action(request: Request, action_req: ActionRequest, _: bool =
         )
 
     # Create detected action
+    try:
+        action_type = ActionType(action_req.action_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid action_type: '{action_req.action_type}'")
+
     action = DetectedAction(
-        action_type=ActionType(action_req.action_type),
+        action_type=action_type,
         target=action_req.target,
         target_type=action_req.target_type,
         parameters=action_req.parameters or {}
@@ -244,7 +283,7 @@ async def evaluate_action(request: Request, action_req: ActionRequest, _: bool =
     response = {
         "session_id": action_req.session_id,
         "action_type": action_req.action_type,
-        "target": request.target,
+        "target": action_req.target,
         "decision": evaluation.decision.value,
         "risk_score": evaluation.risk_score,
         "risk_level": evaluation.risk_level.value,
@@ -288,10 +327,8 @@ async def evaluate_action(request: Request, action_req: ActionRequest, _: bool =
 
     await event_bus.publish_event("action", response)
     
-    # We delay stats update publish slightly to ensure current request returns fast
-    # but for simplicity, we publish immediately
-    stats = await get_dashboard_stats()
-    await event_bus.publish_event("stats_update", stats)
+    # Publish lightweight stats update (no full queue iteration on every request)
+    await event_bus.publish_event("stats_update", await get_lightweight_stats())
 
     return response
 
@@ -412,10 +449,23 @@ async def simulate_attack(
         "action": response
     })
     
-    stats = await get_dashboard_stats()
+    stats = await get_lightweight_stats()
     await event_bus.publish_event("stats_update", stats)
 
     return response
+
+
+async def get_lightweight_stats():
+    """Get dashboard stats without traversing full review queue."""
+    c = counters.get_counters()
+    return {
+        "total_sessions": c.total_sessions,
+        "actions_today": c.actions_today,
+        "blocked_actions": c.blocked_actions,
+        "quarantined": c.quarantined,
+        "avg_response_time_ms": round(c.avg_response_time_ms, 2),
+        "threat_level": "high" if c.blocked_actions > 25 else "normal"
+    }
 
 
 # ============ Human Review Endpoints ============
@@ -454,11 +504,9 @@ async def claim_review(request: Request, item_id: str, reviewer_id: str):
 @limiter.limit("30/minute")
 async def submit_review_decision(request: Request, decision: ReviewDecision, _: bool = Depends(require_engine_ready)):
     """Submit a review decision."""
-    # Import ActionType for the completion
-
     item = _review_queue.complete_review(
         item_id=decision.item_id,
-        reviewer_id="reviewer_001",  # In production, from auth
+        reviewer_id="demo-reviewer",  # In production, from auth
         decision=decision.decision,
         notes=decision.notes or ""
     )

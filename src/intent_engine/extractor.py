@@ -143,7 +143,7 @@ class GeminiClient:
                 if attempt < self.gemini_config.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
                     continue
-                raise RuntimeError(f"Gemini API call failed: {e}")
+                raise RuntimeError(f"Gemini API call failed after {self.gemini_config.max_retries} retries")
 
 
 class IntentExtractor:
@@ -248,7 +248,7 @@ class IntentExtractor:
 
         except Exception as e:
             # Fail-secure: return conservative manifest on any error
-            warnings.append(f"Extraction failed: {e}")
+            warnings.append("Extraction failed — using conservative fallback")
 
             manifest = create_conservative_manifest(session_id)
             extraction_time = (time.time() - start_time) * 1000

@@ -533,7 +533,7 @@ class LobsterTrapProxy:
                         evaluation_time_ms=data.get("evaluation_time_ms", 0.0)
                     )
             except Exception as e:
-                print(f"Warning: Failed to reach real Lobster Trap binary ({e}). Falling back to simulation.")
+                logger.warning("Failed to reach real Lobster Trap binary (%s). Falling back to simulation.", e)
 
         return self.engine.evaluate_action(manifest, action)
 

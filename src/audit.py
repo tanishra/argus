@@ -6,7 +6,7 @@ from typing import Optional
 
 logger = logging.getLogger("argus.audit")
 
-AUDIT_LOG_PATH = os.getenv("AUDIT_LOG_PATH", "data/audit.log")
+AUDIT_LOG_PATH = os.path.abspath(os.getenv("AUDIT_LOG_PATH", "data/audit.log"))
 
 
 def _ensure_dir(path: str):
@@ -32,6 +32,8 @@ async def log_event(
     try:
         with open(AUDIT_LOG_PATH, "a") as f:
             f.write(json.dumps(entry) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
     except OSError as e:
         logger.error("Failed to write audit log: %s", e)
 

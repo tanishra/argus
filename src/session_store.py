@@ -10,25 +10,29 @@ logger = logging.getLogger("argus.session_store")
 
 _redis_client: Optional[redis.Redis] = None
 _memory_fallback: dict[str, str] = {}
+_redis_lock = asyncio.Lock()
 
 async def get_redis(max_retries: int = 3) -> redis.Redis:
     global _redis_client
     if _redis_client is not None:
         return _redis_client
 
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-    for attempt in range(max_retries):
-        try:
-            client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
-            await client.ping()
-            _redis_client = client
+    async with _redis_lock:
+        if _redis_client is not None:
             return _redis_client
-        except Exception as e:
-            logger.warning("Redis connection attempt %d/%d failed: %s", attempt + 1, max_retries, e)
-            if attempt < max_retries - 1:
-                await asyncio.sleep(2 ** attempt)
-    logger.warning("All Redis connection attempts failed; using in-memory fallback")
-    return None
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        for attempt in range(max_retries):
+            try:
+                client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+                await client.ping()
+                _redis_client = client
+                return _redis_client
+            except Exception as e:
+                logger.warning("Redis connection attempt %d/%d failed: %s", attempt + 1, max_retries, e)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+        logger.warning("All Redis connection attempts failed; using in-memory fallback")
+        return None
 
 async def save_manifest(session_id: str, manifest: IntentManifest, ttl_seconds: int = 3600):
     """Save manifest to Redis with TTL. Falls back to in-memory dict."""

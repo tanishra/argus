@@ -128,7 +128,7 @@ class GeminiProClient:
                 if attempt < self.gemini_config.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
-                raise RuntimeError(f"Gemini Pro API call failed: {e}")
+                raise RuntimeError(f"Gemini Pro API call failed after {self.config.max_retries} retries")
 
 
 class ExplanationEngine:
@@ -311,6 +311,7 @@ class ExplanationEngine:
         error: str
     ) -> MismatchExplanation:
         """Generate fallback explanation when Gemini Pro fails."""
+        logger.warning("Falling back to template explanation. Gemini error: %s", error)
         return MismatchExplanation(
             summary=f"Intent mismatch: {detected_action.action_type.value} not authorized",
             detailed_reason=f"The detected action '{detected_action.action_type.value}' targeting '{detected_action.target}' does not match the declared intent '{manifest.declared_intent.value}'. This may indicate a prompt injection attack or unauthorized action attempt.",
