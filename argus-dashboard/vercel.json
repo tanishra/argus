@@ -1,0 +1,8 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm install -g pnpm && pnpm install --no-frozen-lockfile && tsc -b && BUILD_MODE=prod vite build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
