@@ -31,7 +31,8 @@ from . import session_store
 from . import counters
 from . import event_bus
 from . import audit
-from .logging_config import setup_logging, RequestLogMiddleware
+from . import database
+from .logging_config import setup_logging, LogCorrelationMiddleware, RequestLogMiddleware
 
 # ============ Auth ============
 
@@ -136,10 +137,13 @@ async def lifespan(app: FastAPI):
     # Startup
     setup_logging()
     validate_environment()
+    await database.init_db()
     _intent_extractor = IntentExtractor()
     _explanation_engine = ExplanationEngine()
     _lobster_proxy = LobsterTrapProxy()
     _review_queue = ReviewQueue()
+    await _review_queue._load_from_db()
+    await audit.backfill_file_to_db()
     await event_bus.start_sweeper()
 
     yield
@@ -150,6 +154,7 @@ async def lifespan(app: FastAPI):
         await _intent_extractor.close()
     if _explanation_engine:
         await _explanation_engine.close()
+    await database.close_db()
 
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
@@ -173,8 +178,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request logging
+# Request logging with correlation IDs
 app.add_middleware(RequestLogMiddleware)
+app.add_middleware(LogCorrelationMiddleware)
 
 
 # ============ Intent Engine Endpoints ============

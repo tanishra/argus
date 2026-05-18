@@ -8,15 +8,13 @@ httpx>=0.25.0
 sse-starlette>=0.6.0
 slowapi>=0.1.9
 
-### Policy Enforcement (Layer 2)
-pyyaml>=6.0
-
 ### Explanation Engine (Layer 3B)
 # Uses Gemini Pro - configured via GEMINI_API_KEY
 
 ### Database
 asyncpg>=0.29.0
 sqlalchemy[asyncio]>=2.0.23
+aiosqlite>=0.19.0
 
 ### Caching & Session
 redis[asyncio]>=5.0.1

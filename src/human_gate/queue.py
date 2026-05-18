@@ -9,6 +9,7 @@ and high-risk actions that require human decision-making.
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -17,6 +18,9 @@ from typing import Optional
 
 
 from ..intent_engine.models import IntentManifest, ActionType
+from .. import database
+
+logger = logging.getLogger("argus.review_queue")
 from ..lobster_proxy.engine import DetectedAction, PolicyEvaluation, Decision
 
 
@@ -196,6 +200,49 @@ class ReviewQueue:
         self._pending_list: list[str] = []  # Ordered by priority/time
         self._reviewers: dict[str, dict] = {}  # reviewer_id -> metadata
         self._lock = asyncio.Lock()
+        self._db_loaded = False
+
+    async def _load_from_db(self) -> None:
+        """Restore active review items from database on startup."""
+        if self._db_loaded:
+            return
+        self._db_loaded = True
+        try:
+            records = await database.load_active_review_records()
+            if not records:
+                return
+            for data in records:
+                item = ReviewItem.from_dict(data)
+                self._items[item.id] = item
+                if item.status in [ReviewStatus.PENDING, ReviewStatus.IN_REVIEW]:
+                    self._pending_list.append(item.id)
+            self._sort_pending_list()
+            logger.info("Loaded %d active review items from database", len(records))
+        except Exception as e:
+            logger.warning("Failed to load review items from database: %s", e)
+
+    async def _persist_item(self, item: ReviewItem) -> None:
+        """Persist review item to database (outside lock)."""
+        try:
+            await database.save_review_record(
+                item_id=item.id,
+                data=item.to_dict(),
+                status=item.status.value,
+                created_at=item.created_at,
+            )
+        except Exception as e:
+            logger.warning("Failed to persist review item %s: %s", item.id, e)
+
+    async def _update_item_status(self, item: ReviewItem) -> None:
+        """Update review item status in database (outside lock)."""
+        try:
+            await database.update_review_record(
+                item_id=item.id,
+                status=item.status.value,
+                data=item.to_dict(),
+            )
+        except Exception as e:
+            logger.warning("Failed to update review item %s: %s", item.id, e)
 
     async def add_item(
         self,
@@ -231,7 +278,8 @@ class ReviewQueue:
             self._sort_pending_list()
             item.add_audit_entry("created", "system", "Item added to review queue")
 
-            return item
+        await self._persist_item(item)
+        return item
 
     def _calculate_priority(self, evaluation: PolicyEvaluation) -> ReviewPriority:
         """Calculate priority based on policy evaluation."""
@@ -311,7 +359,8 @@ class ReviewQueue:
             item.assigned_reviewer = reviewer_id
             item.add_audit_entry("claimed", reviewer_id)
 
-            return item
+        await self._update_item_status(item)
+        return item
 
     async def complete_review(
         self,
@@ -348,7 +397,8 @@ class ReviewQueue:
             if item_id in self._pending_list:
                 self._pending_list.remove(item_id)
 
-            return item
+        await self._update_item_status(item)
+        return item
 
     async def escalate(self, item_id: str, reason: str) -> Optional[ReviewItem]:
         """Escalate an item to higher priority."""
@@ -373,7 +423,8 @@ class ReviewQueue:
             if item_id in self._pending_list:
                 self._pending_list.remove(item_id)
 
-            return item
+        await self._update_item_status(item)
+        return item
 
     async def get_statistics(self) -> dict:
         """Get queue statistics."""
