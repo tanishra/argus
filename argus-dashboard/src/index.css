@@ -68,7 +68,7 @@
   }
   .card-hover:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(79, 70, 229, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 8px 30px rgba(79, 70, 229, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03), 0 0 20px rgba(79, 70, 229, 0.04);
     border-color: rgba(79, 70, 229, 0.15);
   }
 
@@ -83,7 +83,7 @@
     @apply bg-white rounded-xl border border-border/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all duration-300 ease-out;
   }
   .premium-card:hover {
-    @apply shadow-[0_8px_30px_rgba(79,70,229,0.06),0_2px_8px_rgba(0,0,0,0.03)];
+    @apply shadow-[0_8px_30px_rgba(79,70,229,0.06),0_2px_8px_rgba(0,0,0,0.03),0_0_20px_rgba(79,70,229,0.04)];
     border-color: rgba(79, 70, 229, 0.15);
   }
 

@@ -103,6 +103,10 @@ export default function Dashboard() {
             using intent-driven policy enforcement.
           </p>
 
+          <p className="text-xs text-muted-foreground/60 italic mb-8 -mt-4 animate-slide-up" style={{ animationDelay: '0.15s' }}>
+            Agents have passwords. Now they have permission slips.
+          </p>
+
           <div className="flex items-center justify-center gap-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
             <a
               href="/demo"
@@ -112,7 +116,7 @@ export default function Dashboard() {
               <PlayCircle className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </a>
             <a
-              href="https://github.com"
+              href="https://github.com/tanishra/argus"
               target="_blank"
               rel="noopener noreferrer"
               className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-foreground rounded-xl font-medium border border-border/60 hover:border-border hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] transition-all duration-300"
