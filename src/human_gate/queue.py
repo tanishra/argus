@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 
@@ -226,8 +226,7 @@ class ReviewQueue:
 
         # Calculate deadline based on priority
         sla_hours = self._get_sla_hours(priority)
-        deadline = datetime.now(timezone.utc)
-        deadline = deadline.replace(hour=deadline.hour + sla_hours)
+        deadline = datetime.now(timezone.utc) + timedelta(hours=sla_hours)
 
         item = ReviewItem(
             manifest=manifest,
@@ -295,8 +294,7 @@ class ReviewQueue:
 
             return (
                 priority_order.get(item.priority, 3),
-                item.created_at.isoformat(),
-                item.id
+                item.created_at.timestamp(),
             )
 
         self._pending_list.sort(key=sort_key)

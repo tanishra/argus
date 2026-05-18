@@ -1,54 +1,68 @@
+import asyncio
 import json
+import logging
 import os
 import redis.asyncio as redis
 from typing import Optional
 from .intent_engine.models import IntentManifest
 
+logger = logging.getLogger("argus.session_store")
+
 _redis_client: Optional[redis.Redis] = None
 _memory_fallback: dict[str, str] = {}
 
-async def get_redis() -> redis.Redis:
+async def get_redis(max_retries: int = 3) -> redis.Redis:
     global _redis_client
-    if _redis_client is None:
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        _redis_client = redis.from_url(
-            redis_url,
-            encoding="utf-8",
-            decode_responses=True
-        )
-    return _redis_client
+    if _redis_client is not None:
+        return _redis_client
+
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    for attempt in range(max_retries):
+        try:
+            client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+            await client.ping()
+            _redis_client = client
+            return _redis_client
+        except Exception as e:
+            logger.warning("Redis connection attempt %d/%d failed: %s", attempt + 1, max_retries, e)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)
+    logger.warning("All Redis connection attempts failed; using in-memory fallback")
+    return None
 
 async def save_manifest(session_id: str, manifest: IntentManifest, ttl_seconds: int = 3600):
-    """Save manifest to Redis with TTL."""
-    try:
-        client = await get_redis()
-        await client.setex(
-            f"argus:session:{session_id}",
-            ttl_seconds,
-            json.dumps(manifest.to_dict())
-        )
-    except Exception:
-        # Fallback to in-memory dict
-        _memory_fallback[session_id] = json.dumps(manifest.to_dict())
+    """Save manifest to Redis with TTL. Falls back to in-memory dict."""
+    client = await get_redis()
+    payload = json.dumps(manifest.to_dict())
+    if client:
+        try:
+            await client.setex(f"argus:session:{session_id}", ttl_seconds, payload)
+            return
+        except Exception:
+            logger.exception("Redis save failed, falling back to memory")
+    _memory_fallback[session_id] = payload
 
 async def get_manifest(session_id: str) -> Optional[IntentManifest]:
-    """Retrieve manifest from Redis."""
-    try:
-        client = await get_redis()
-        data = await client.get(f"argus:session:{session_id}")
-    except Exception:
-        # Fallback
+    """Retrieve manifest from Redis. Falls back to in-memory."""
+    data = None
+    client = await get_redis()
+    if client:
+        try:
+            data = await client.get(f"argus:session:{session_id}")
+        except Exception:
+            logger.exception("Redis read failed, trying fallback")
+    if data is None:
         data = _memory_fallback.get(session_id)
-        
     if data:
         return IntentManifest.from_dict(json.loads(data))
     return None
 
 async def delete_manifest(session_id: str):
-    """Delete manifest from Redis."""
-    try:
-        client = await get_redis()
-        await client.delete(f"argus:session:{session_id}")
-    except Exception:
-        if session_id in _memory_fallback:
-            del _memory_fallback[session_id]
+    """Delete manifest from Redis and fallback."""
+    client = await get_redis()
+    if client:
+        try:
+            await client.delete(f"argus:session:{session_id}")
+        except Exception:
+            logger.exception("Redis delete failed")
+    _memory_fallback.pop(session_id, None)

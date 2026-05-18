@@ -28,6 +28,7 @@ from .human_gate import ReviewQueue
 from . import session_store
 from . import counters
 from . import event_bus
+from . import audit
 from .logging_config import setup_logging, RequestLogMiddleware
 
 # ============ Auth ============
@@ -156,6 +157,11 @@ async def extract_intent(request: Request, intent_req: IntentRequest):
     # Store manifest in session store so evaluate_action can retrieve it
     await session_store.save_manifest(result.manifest.session_id, result.manifest)
     await counters.increment_sessions()
+    await audit.log_event("intent_extracted", result.manifest.session_id, {
+        "declared_intent": result.manifest.declared_intent.value,
+        "confidence": result.confidence,
+        "fallback_used": result.fallback_used
+    }, user_id=intent_req.user_id)
 
     return {
         "session_id": result.manifest.session_id,
@@ -265,6 +271,13 @@ async def evaluate_action(request: Request, action_req: ActionRequest):
             "message": f"Suspicious action {action.action_type.value} requires review",
             "action": response
         })
+
+    await audit.log_event("action_evaluated", action_req.session_id, {
+        "action_type": action_req.action_type,
+        "target": action_req.target,
+        "decision": evaluation.decision.value,
+        "risk_score": evaluation.risk_score,
+    })
 
     await event_bus.publish_event("action", response)
     
@@ -445,6 +458,12 @@ async def submit_review_decision(request: Request, decision: ReviewDecision):
     if not item:
         raise HTTPException(status_code=404, detail="Review item not found")
 
+    await audit.log_event("review_decision", item.manifest.session_id if item.manifest else "unknown", {
+        "item_id": item.id,
+        "decision": decision.decision,
+        "reviewer_notes": decision.notes or "",
+    })
+
     return {
         "item_id": item.id,
         "status": item.status.value,
@@ -508,6 +527,8 @@ async def dashboard_feed():
 
 # ============ Compliance Endpoints ============
 
+VALID_EXPORT_FORMATS = {"json", "pdf", "csv"}
+
 @app.get("/api/compliance/export/{session_id}")
 async def export_compliance_report(session_id: str, format: str = "json"):
     """
@@ -515,28 +536,33 @@ async def export_compliance_report(session_id: str, format: str = "json"):
 
     Supports JSON, PDF, and CSV formats.
     """
+    if format not in VALID_EXPORT_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Invalid format '{format}'. Must be one of: {', '.join(sorted(VALID_EXPORT_FORMATS))}")
+
     # Fetch real session manifest
     manifest = await session_store.get_manifest(session_id)
     manifest_data = manifest.to_dict() if manifest else {"error": "session not found"}
     
-    # In production, this would generate actual reports
+    c = counters.get_counters()
+    audit_log = await audit.get_recent_events(limit=50)
     report = {
         "session_id": session_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "intent_manifest": manifest_data,
-        "actions_evaluated": 12,
-        "actions_blocked": 2,
-        "actions_quarantined": 1,
+        "actions_evaluated": c.actions_today,
+        "actions_blocked": c.blocked_actions,
+        "actions_quarantined": c.quarantined,
         "review_items": [item.to_dict() for item in _review_queue.get_pending()[:5]],
-        "audit_log": []
+        "audit_log": audit_log
     }
 
     if format == "json":
         return report
     elif format == "pdf":
         return {"message": "PDF export not implemented in demo", "report": report}
-    else:
-        return report
+    elif format == "csv":
+        return {"message": "CSV export not implemented in demo", "report": report}
+    return report
 
 
 # ============ Health Check ============
