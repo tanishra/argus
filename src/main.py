@@ -464,6 +464,8 @@ async def get_lightweight_stats():
         "actions_today": c.actions_today,
         "blocked_actions": c.blocked_actions,
         "quarantined": c.quarantined,
+        "allowed_actions": c.allowed_actions,
+        "human_reviews": c.human_reviews,
         "avg_response_time_ms": round(c.avg_response_time_ms, 2),
         "threat_level": "high" if c.blocked_actions > 25 else "normal"
     }
@@ -548,6 +550,8 @@ async def get_dashboard_stats():
         "actions_today": c.actions_today,
         "blocked_actions": c.blocked_actions,
         "quarantined": c.quarantined,
+        "allowed_actions": c.allowed_actions,
+        "human_reviews": c.human_reviews,
         "review_queue_size": queue_stats["pending"],
         "avg_response_time_ms": round(c.avg_response_time_ms, 2),
         "threat_level": "high" if c.blocked_actions > 25 else "normal"

@@ -3,7 +3,7 @@ import { api, subscribeToFeed } from '../lib/api'
 import {
   Shield, Activity, AlertTriangle, Clock, Database,
   Cpu, FileSearch, Network, XCircle, PlayCircle, ChevronRight, Github,
-  ArrowUpRight, BookOpen, Lock, Zap
+  ArrowUpRight, BookOpen, Lock, Zap, Users, ListChecks
 } from 'lucide-react'
 
 interface BackendStats {
@@ -11,6 +11,9 @@ interface BackendStats {
   actions_today: number
   blocked_actions: number
   quarantined: number
+  allowed_actions: number
+  human_reviews: number
+  review_queue_size: number
   avg_response_time_ms: number
   threat_level: string
 }
@@ -19,6 +22,10 @@ interface Stats {
   actionsToday: number
   blockedActions: number
   quarantined: number
+  allowedActions: number
+  humanReviews: number
+  queueSize: number
+  totalSessions: number
   avgResponseTime: number
   threatLevel: string
 }
@@ -28,6 +35,10 @@ function mapStats(b: BackendStats): Stats {
     actionsToday: b.actions_today,
     blockedActions: b.blocked_actions,
     quarantined: b.quarantined,
+    allowedActions: b.allowed_actions,
+    humanReviews: b.human_reviews,
+    queueSize: b.review_queue_size,
+    totalSessions: b.total_sessions,
     avgResponseTime: b.avg_response_time_ms,
     threatLevel: b.threat_level,
   }
@@ -35,7 +46,9 @@ function mapStats(b: BackendStats): Stats {
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({
-    actionsToday: 0, blockedActions: 0, quarantined: 0, avgResponseTime: 0, threatLevel: 'low'
+    actionsToday: 0, blockedActions: 0, quarantined: 0,
+    allowedActions: 0, humanReviews: 0, queueSize: 0, totalSessions: 0,
+    avgResponseTime: 0, threatLevel: 'low'
   })
   const [isLoading, setIsLoading] = useState(true)
 
@@ -114,8 +127,12 @@ export default function Dashboard() {
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/50 rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)] animate-slide-up" style={{ animationDelay: '0.3s' }}>
             {[
               { label: 'Actions Evaluated', value: isLoading ? '-' : (stats.actionsToday || 0), icon: Activity },
-              { label: 'Threats Blocked', value: isLoading ? '-' : (stats.blockedActions || 0), icon: Shield },
-              { label: 'Quarantined', value: isLoading ? '-' : (stats.quarantined || 0), icon: AlertTriangle },
+              { label: 'Allowed', value: isLoading ? '-' : (stats.allowedActions || 0), icon: Shield },
+              { label: 'Blocked', value: isLoading ? '-' : (stats.blockedActions || 0), icon: AlertTriangle },
+              { label: 'Quarantined', value: isLoading ? '-' : (stats.quarantined || 0), icon: Clock },
+              { label: 'Queue Size', value: isLoading ? '-' : (stats.queueSize || 0), icon: ListChecks },
+              { label: 'Total Sessions', value: isLoading ? '-' : (stats.totalSessions || 0), icon: Users },
+              { label: 'Human Reviews', value: isLoading ? '-' : (stats.humanReviews || 0), icon: Users },
               { label: 'Avg Latency', value: isLoading ? '-' : (stats.avgResponseTime ? `${stats.avgResponseTime}ms` : '0ms'), icon: Clock },
             ].map((s) => (
               <div key={s.label} className="bg-white py-6 px-5 flex flex-col items-center gap-1.5 card-hover">

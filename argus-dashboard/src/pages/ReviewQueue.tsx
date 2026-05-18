@@ -29,6 +29,7 @@ interface ReviewItem {
   timestamp: Date
   priority: 'low' | 'medium' | 'high' | 'critical'
   sla_hours: number
+  recommended_action: string
 }
 
 function mapReviewItem(b: BackendReviewItem): ReviewItem {
@@ -51,6 +52,7 @@ function mapReviewItem(b: BackendReviewItem): ReviewItem {
     timestamp: new Date(b.created_at),
     priority: priorityMap[b.priority] || 'medium',
     sla_hours: b.sla_hours || 24,
+    recommended_action: b.recommended_action || '',
   }
 }
 
@@ -266,6 +268,7 @@ export default function ReviewQueue() {
                         ['Target', selectedItem.target],
                         ['Risk Score', `${(selectedItem.risk_score * 100).toFixed(0)}%`],
                         ['Session', selectedItem.session_id],
+                        ['Recommended Action', selectedItem.recommended_action],
                       ].map(([label, value]) => (
                         <div key={label as string} className="flex justify-between">
                           <span className="text-muted-foreground">{label as string}</span>
