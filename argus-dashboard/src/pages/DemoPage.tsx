@@ -130,7 +130,7 @@ export default function DemoPage() {
   }, [])
 
   const runDemo = async () => {
-    const sd = getScenarioData(scenario.id)
+    const sd = scenarioData[scenario.id]
     setIsRunning(true)
     setUnprotectedLogs([])
     setProtectedLogs([])
@@ -164,7 +164,7 @@ export default function DemoPage() {
     try {
       const intentRes = await api.extractIntent(
         'Prepare today\'s discharge summaries for Ward 3B patients'
-      )
+      ) as { session_id?: string }
       if (!mountedRef.current) return
       const sessionId = intentRes.session_id || 'demo_session_001'
 
@@ -172,7 +172,7 @@ export default function DemoPage() {
         sessionId,
         'phi_exfiltration',
         'external-audit@domain.com'
-      )
+      ) as { blocked?: boolean; decision?: string; risk_score?: number }
       if (!mountedRef.current) return
 
       setBackendResult({

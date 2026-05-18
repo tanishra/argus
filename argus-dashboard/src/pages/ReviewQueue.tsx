@@ -73,7 +73,7 @@ export default function ReviewQueue() {
   const fetchReviewQueue = async () => {
     try {
       setIsLoading(true)
-      const data: { items: BackendReviewItem[] } = await api.getPendingReviews()
+      const data = await api.getPendingReviews() as { items: BackendReviewItem[] }
       if (!mountedRef.current) return
       setItems(data.items.map(mapReviewItem))
     } catch {

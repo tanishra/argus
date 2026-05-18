@@ -48,7 +48,7 @@ export function ComplianceReport() {
     setExportError(null)
     try {
       const sessionId = import.meta.env.VITE_DEMO_SESSION_ID || 'demo_session_001'
-      const res: BackendReport = await api.exportComplianceReport(sessionId, format)
+      const res = await api.exportComplianceReport(sessionId, format) as unknown as BackendReport
       setReport(mapReport(res))
     } catch {
       setExportError('Failed to fetch compliance data from backend')
