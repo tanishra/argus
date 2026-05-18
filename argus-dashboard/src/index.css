@@ -4,35 +4,128 @@
 
 @layer base {
   :root {
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%
+    --radius: 0.75rem;
+    --background: 48 20% 97%;
+    --foreground: 60 3% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 60 3% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 60 3% 10%;
+    --primary: 245 58% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 48 13% 95%;
+    --secondary-foreground: 60 3% 10%;
+    --muted: 48 13% 95%;
+    --muted-foreground: 60 3% 47%;
+    --accent: 270 67% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 48 8% 89%;
+    --input: 48 8% 89%;
+    --ring: 245 58% 51%;
   }
 
-  .dark {
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%
+  * { @apply border-border; }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  html { scroll-behavior: smooth; }
+
+  ::selection { @apply bg-primary/15 text-primary; }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #4F46E5 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% 100%;
+    animation: gradient-shift 4s ease-in-out infinite;
+  }
+
+  .bg-noise {
+    position: relative;
+  }
+  .bg-noise::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.015;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-size: 256px 256px;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: multiply;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(79, 70, 229, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03);
+    border-color: rgba(79, 70, 229, 0.15);
+  }
+
+  .icon-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+  .icon-hover:hover {
+    transform: scale(1.05) translateY(-1px);
+  }
+
+  .premium-card {
+    @apply bg-white rounded-xl border border-border/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all duration-300 ease-out;
+  }
+  .premium-card:hover {
+    @apply shadow-[0_8px_30px_rgba(79,70,229,0.06),0_2px_8px_rgba(0,0,0,0.03)];
+    border-color: rgba(79, 70, 229, 0.15);
+  }
+
+  .premium-input {
+    @apply bg-white border border-border rounded-lg px-4 py-2.5 text-sm 
+           focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
+           placeholder:text-muted-foreground transition-all duration-200;
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .link-underline {
+    @apply relative;
+  }
+  .link-underline::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-full h-px bg-current scale-x-0 transition-transform duration-300 origin-right;
+  }
+  .link-underline:hover::after {
+    @apply scale-x-100 origin-left;
   }
 }
 
-
-
-img {
-  object-position: top;
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
-.fixed {
-  position: fixed;
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }

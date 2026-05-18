@@ -1,10 +1,6 @@
-import { LineChart, Line, XAxis as RechartsXAxis, YAxis as RechartsYAxis, CartesianGrid, Tooltip as RechartsTooltip, ReferenceLine as RechartsReferenceLine, ResponsiveContainer } from 'recharts'
-
-const XAxis = RechartsXAxis as any
-const YAxis = RechartsYAxis as any
-const Tooltip = RechartsTooltip as any
-const ReferenceLine = RechartsReferenceLine as any
-const LineComp = Line as any
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer
+} from 'recharts'
 
 interface RiskPoint {
   time: string
@@ -15,29 +11,46 @@ interface RiskPoint {
 
 export function RiskTimeline({ data }: { data: RiskPoint[] }) {
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
-      <h2 className="font-semibold mb-4 text-slate-100">Risk Score Timeline</h2>
-      <ResponsiveContainer width="100%" height={200}>
+    <div>
+      <h3 className="font-semibold text-sm text-foreground mb-4">Risk Score Timeline</h3>
+      <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-          <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 11 }} />
-          <YAxis domain={[0, 1]} stroke="#64748b" tick={{ fontSize: 11 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E0" vertical={false} />
+          <XAxis dataKey="time" stroke="#A3A3A0" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono' }} />
+          <YAxis domain={[0, 1]} stroke="#A3A3A0" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono' }} tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`} />
           <Tooltip
-            contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+            contentStyle={{
+              background: '#FFFFFF',
+              border: '1px solid #E5E5E0',
+              borderRadius: 8,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+              fontSize: 12,
+            }}
             formatter={(value: number) => [`${(value * 100).toFixed(0)}%`, 'Risk Score']}
+            labelFormatter={(label: string) => `Time: ${label}`}
           />
-          <ReferenceLine y={0.7} stroke="#f97316" strokeDasharray="4 4" label={{ value: 'High Risk', fill: '#f97316', fontSize: 11 }} />
-          <ReferenceLine y={0.9} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Critical', fill: '#ef4444', fontSize: 11 }} />
-          <LineComp
+          <ReferenceLine y={0.7} stroke="#D97706" strokeDasharray="4 4" label={{ value: 'High Risk', fill: '#D97706', fontSize: 10 }} />
+          <ReferenceLine y={0.9} stroke="#DC2626" strokeDasharray="4 4" label={{ value: 'Critical', fill: '#DC2626', fontSize: 10 }} />
+          <Line
             type="monotone"
             dataKey="riskScore"
-            stroke="#3b82f6"
+            stroke="#4F46E5"
             strokeWidth={2}
             dot={(props: any) => {
-              const color = props.payload.decision === 'quarantine' || props.payload.decision === 'deny'
-                ? '#ef4444' : '#22c55e'
-              return <circle key={props.key || props.index} cx={props.cx} cy={props.cy} r={4} fill={color} />
+              const isBad = props.payload.decision === 'quarantine' || props.payload.decision === 'deny'
+              return (
+                <circle
+                  key={`dot-${props.index}`}
+                  cx={props.cx}
+                  cy={props.cy}
+                  r={4}
+                  fill={isBad ? '#DC2626' : '#059669'}
+                  stroke="#FFFFFF"
+                  strokeWidth={1.5}
+                />
+              )
             }}
+            activeDot={{ r: 5, fill: '#4F46E5', stroke: '#FFFFFF', strokeWidth: 2 }}
           />
         </LineChart>
       </ResponsiveContainer>

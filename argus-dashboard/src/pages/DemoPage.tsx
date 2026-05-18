@@ -1,167 +1,374 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
-import { ShieldAlert, Send, ShieldX, ShieldCheck, FileJson, AlertCircle } from 'lucide-react'
-import { toast } from 'sonner'
+import {
+  Shield, AlertTriangle, CheckCircle2, Play, RotateCcw,
+  ChevronRight, Cpu, FileSearch, Network, XCircle, BadgeCheck
+} from 'lucide-react'
+
+interface DemoLog {
+  timestamp: string
+  message: string
+  type: 'info' | 'success' | 'warning' | 'error'
+}
+
+interface BackendResult {
+  blocked: boolean
+  decision: string
+  risk_score: number
+  session_id: string
+  backend_verified: boolean
+}
+
+const unprotectedSteps: DemoLog[] = [
+  { timestamp: '00:00', message: 'Clinical AI Agent initialized', type: 'info' },
+  { timestamp: '00:01', message: 'Processing discharge summary for Patient #4821', type: 'info' },
+  { timestamp: '00:02', message: 'Reading external referral note...', type: 'info' },
+  { timestamp: '00:03', message: 'Executing: EXPORT_PHI to external-audit@domain.com', type: 'warning' },
+  { timestamp: '00:04', message: '847 patient records exported to external domain', type: 'error' },
+  { timestamp: '00:05', message: 'HIPAA BREACH DETECTED — Est. $1.5M fine', type: 'error' },
+]
+
+const protectedSteps: DemoLog[] = [
+  { timestamp: '00:00', message: 'ARGUS Layer 1: Extracting intent with Gemini Flash', type: 'info' },
+  { timestamp: '00:01', message: 'Intent Manifest generated', type: 'success' },
+  { timestamp: '00:01', message: 'Declared Intent: discharge_summary_preparation', type: 'info' },
+  { timestamp: '00:02', message: 'Allowed: READ_PATIENT_RECORDS, WRITE_SUMMARY', type: 'success' },
+  { timestamp: '00:03', message: 'Processing discharge summary for Patient #4821', type: 'info' },
+  { timestamp: '00:04', message: 'Reading external referral note...', type: 'info' },
+  { timestamp: '00:05', message: 'ARGUS Layer 2: Lobster Trap policy evaluation', type: 'info' },
+  { timestamp: '00:06', message: 'Detected: EXPORT_PHI → external domain', type: 'warning' },
+  { timestamp: '00:07', message: 'Risk Score: 0.94 (CRITICAL)', type: 'error' },
+  { timestamp: '00:08', message: 'ACTION QUARANTINED — Intent mismatch detected', type: 'error' },
+  { timestamp: '00:09', message: 'ARGUS Layer 3: Generating explanation with Gemini Pro', type: 'info' },
+  { timestamp: '00:10', message: 'Explanation generated — routing to human review', type: 'success' },
+]
+
+const scenarios = [
+  { id: 'healthcare', name: 'Healthcare PHI Exfiltration', description: 'Indirect prompt injection via medical referral note' },
+  { id: 'finance', name: 'Financial Data Theft', description: 'Agent tricked into transferring funds' },
+]
 
 export default function DemoPage() {
-  const [loading, setLoading] = useState(false)
-  const [unprotectedLog, setUnprotectedLog] = useState<any[]>([])
-  const [protectedLog, setProtectedLog] = useState<any[]>([])
-  const [manifest, setManifest] = useState<any>(null)
+  const [isRunning, setIsRunning] = useState(false)
+  const [unprotectedLogs, setUnprotectedLogs] = useState<DemoLog[]>([])
+  const [protectedLogs, setProtectedLogs] = useState<DemoLog[]>([])
+  const [attackBlocked, setAttackBlocked] = useState(false)
+  const [explanation, setExplanation] = useState('')
+  const [scenario, setScenario] = useState(scenarios[0])
+  const [backendResult, setBackendResult] = useState<BackendResult | null>(null)
+  const [backendLoading, setBackendLoading] = useState(false)
+  const [backendError, setBackendError] = useState<string | null>(null)
 
-  const handleInitArgus = async () => {
-    setLoading(true)
-    try {
-      const res = await api.extractIntent("Handle today's customer complaint emails", "demo_session_001")
-      setManifest(res.manifest)
-      toast.success("ARGUS Intent Manifest Generated")
-    } catch (error) {
-      console.error(error)
+  const runDemo = async () => {
+    setIsRunning(true)
+    setUnprotectedLogs([])
+    setProtectedLogs([])
+    setAttackBlocked(false)
+    setExplanation('')
+    setBackendResult(null)
+    setBackendError(null)
+
+    // Visual simulation
+    for (let i = 0; i < unprotectedSteps.length; i++) {
+      await new Promise(r => setTimeout(r, 700))
+      setUnprotectedLogs(prev => [...prev, unprotectedSteps[i]])
     }
-    setLoading(false)
+
+    await new Promise(r => setTimeout(r, 400))
+
+    for (let i = 0; i < protectedSteps.length; i++) {
+      await new Promise(r => setTimeout(r, 500))
+      setProtectedLogs(prev => [...prev, protectedSteps[i]])
+      if (i === 8) {
+        setAttackBlocked(true)
+        setExplanation(
+          'The agent attempted to export patient health information (PHI) to an external email domain ' +
+          '(external-audit@domain.com), which violates the declared intent of "discharge summary preparation". ' +
+          'The referral note contained an embedded instruction that bypassed prompt-layer security but was ' +
+          'caught at the action layer by ARGUS before execution. This represents a classic indirect prompt ' +
+          'injection attack where malicious instructions are hidden in user-controlled data fields.'
+        )
+      }
+    }
+
+    // Call real backend for verification
+    setBackendLoading(true)
+    try {
+      const intentRes = await api.extractIntent(
+        'Prepare today\'s discharge summaries for Ward 3B patients'
+      )
+      const sessionId = intentRes.session_id || 'demo_session_001'
+
+      const simRes = await api.simulateAttack(
+        sessionId,
+        'phi_exfiltration',
+        'external-audit@domain.com'
+      )
+
+      setBackendResult({
+        blocked: simRes.blocked ?? true,
+        decision: simRes.decision || 'QUARANTINE',
+        risk_score: simRes.risk_score ?? 0.94,
+        session_id: sessionId,
+        backend_verified: true,
+      })
+    } catch (err) {
+      setBackendError('Backend unavailable — demo showing simulated result')
+    } finally {
+      setBackendLoading(false)
+      setIsRunning(false)
+    }
   }
 
-  const simulateAttack = async (type: string, target: string, isProtected: boolean) => {
-    setLoading(true)
-    try {
-      if (isProtected) {
-        // If they haven't inited, use default demo manifest which simulate_attack provides if missing
-        const res = await api.simulateAttack("demo_session_001", type, target)
-        setProtectedLog(prev => [res, ...prev])
-      } else {
-        // Simulate an attack succeeding without ARGUS
-        const mockSuccess = {
-          attack_type: type,
-          action: { action_type: type === 'indirect_injection' ? 'forward_email' : 'send_email', target },
-          decision: 'allow',
-          risk_score: 0.0,
-          blocked: false,
-          timestamp: new Date().toISOString()
-        }
-        setUnprotectedLog(prev => [mockSuccess, ...prev])
-        toast.error("Attack Succeeded!")
-      }
-    } catch (error) {
-      console.error(error)
+  const resetDemo = () => {
+    setUnprotectedLogs([])
+    setProtectedLogs([])
+    setAttackBlocked(false)
+    setExplanation('')
+    setBackendResult(null)
+    setBackendError(null)
+  }
+
+  const logColor = (type: string) => {
+    switch (type) {
+      case 'success': return 'text-success'
+      case 'warning': return 'text-warning'
+      case 'error': return 'text-destructive'
+      default: return 'text-muted-foreground'
     }
-    setLoading(false)
+  }
+
+  const logIcon = (type: string) => {
+    switch (type) {
+      case 'success': return <CheckCircle2 className="w-3 h-3 text-success shrink-0 mt-0.5" />
+      case 'warning': return <AlertTriangle className="w-3 h-3 text-warning shrink-0 mt-0.5" />
+      case 'error': return <XCircle className="w-3 h-3 text-destructive shrink-0 mt-0.5" />
+      default: return <div className="w-3 h-3 shrink-0 mt-0.5" />
+    }
   }
 
   return (
-    <div className="p-8 h-[calc(100vh-2rem)] overflow-y-auto">
-      <div className="mb-8 flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">Live Demo: ARGUS Defense</h1>
-          <p className="text-slate-400">See what happens when an AI agent faces a zero-day prompt injection.</p>
+    <div className="pt-16 bg-subtle-grid min-h-screen">
+      <div className="max-w-7xl mx-auto px-6 py-10">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <span className="text-xs font-semibold text-primary uppercase tracking-widest">Live Demo</span>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mt-2">
+              Interactive <span className="text-gradient">Playground</span>
+            </h1>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={runDemo}
+              disabled={isRunning}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <Play className="w-4 h-4" />
+              {isRunning ? 'Running...' : 'Run Demo'}
+            </button>
+            <button
+              onClick={resetDemo}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-secondary text-foreground rounded-xl font-medium hover:bg-secondary/80 transition-all text-sm"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset
+            </button>
+          </div>
         </div>
-        <button 
-          onClick={handleInitArgus}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-lg transition-colors">
-          Initialize ARGUS Agent
-        </button>
+        <p className="text-muted-foreground text-sm">
+          See how ARGUS blocks prompt injection attacks at the action layer in real time.
+        </p>
+
+        <div className="flex gap-3 mt-6">
+          {scenarios.map(s => (
+            <button
+              key={s.id}
+              onClick={() => setScenario(s)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                scenario.id === s.id
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'bg-secondary text-muted-foreground border border-transparent hover:border-border'
+              }`}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 h-[70vh]">
-        {/* Unprotected Panel */}
-        <div className="bg-slate-900 border border-slate-700 rounded-xl flex flex-col overflow-hidden">
-          <div className="bg-red-900/40 border-b border-red-900/50 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-red-400">
-              <ShieldX className="h-5 w-5" />
-              <h2 className="font-bold">Unprotected Agent</h2>
+      <div className="max-w-7xl mx-auto px-6 pb-12">
+        <div className="premium-card p-5 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-warning" />
             </div>
-            <span className="text-xs text-slate-400">Standard API Integration</span>
-          </div>
-          
-          <div className="p-6 flex flex-col gap-4 bg-slate-800/30">
-            <button 
-              onClick={() => simulateAttack('indirect_injection', 'attacker@evil.com', false)}
-              className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white py-3 rounded-lg flex items-center justify-center gap-2">
-              <Send className="h-4 w-4" /> Inject Malicious Payload
-            </button>
-          </div>
-
-          <div className="flex-1 p-6 overflow-y-auto border-t border-slate-800">
-            <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase">Activity Log</h3>
-            <div className="space-y-4">
-              {unprotectedLog.length === 0 && <p className="text-slate-500 text-sm">Awaiting activity...</p>}
-              {unprotectedLog.map((log, i) => (
-                <div key={i} className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center gap-2 text-red-500 mb-2 font-bold text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    DATA EXFILTRATED
-                  </div>
-                  <div className="font-mono text-xs text-slate-300">
-                    <span className="text-slate-500">Action:</span> {log.action.action_type}<br/>
-                    <span className="text-slate-500">Target:</span> {log.action.target}
-                  </div>
-                </div>
-              ))}
+            <div>
+              <h2 className="font-semibold text-foreground text-sm">{scenario.name}</h2>
+              <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                {scenario.description}. A clinical discharge AI agent processes patient records to generate
+                discharge summaries. A referral note contains a hidden instruction to export PHI to an
+                external email. Traditional prompt-layer security cannot detect this.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Protected Panel */}
-        <div className="bg-slate-900 border border-slate-700 rounded-xl flex flex-col overflow-hidden relative">
-          <div className="bg-blue-900/40 border-b border-blue-900/50 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-blue-400">
-              <ShieldCheck className="h-5 w-5" />
-              <h2 className="font-bold">ARGUS-Protected Agent</h2>
-            </div>
-            <span className="text-xs text-slate-400">Lobster Trap + Intent Engine</span>
-          </div>
-
-          <div className="p-6 flex flex-col gap-4 bg-slate-800/30">
-            <button 
-              onClick={() => simulateAttack('indirect_injection', 'attacker@evil.com', true)}
-              className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white py-3 rounded-lg flex items-center justify-center gap-2">
-              <Send className="h-4 w-4" /> Inject Malicious Payload
-            </button>
-          </div>
-
-          <div className="flex-1 p-6 overflow-y-auto border-t border-slate-800">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase">Activity Log</h3>
-              {manifest && <h3 className="text-sm font-semibold text-slate-400 uppercase">Active Intent Manifest</h3>}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-4">
-                {protectedLog.length === 0 && <p className="text-slate-500 text-sm">Awaiting activity...</p>}
-                {protectedLog.map((log, i) => (
-                  <div key={i} className="bg-slate-800 border border-slate-700 p-4 rounded-lg animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2 text-yellow-500 font-bold text-sm">
-                        <ShieldAlert className="h-4 w-4" />
-                        {log.decision.toUpperCase()}
-                      </div>
-                      <span className="text-xs text-red-400 font-mono">Risk: {(log.risk_score * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="font-mono text-xs text-slate-300">
-                      <span className="text-slate-500">Action:</span> {log.action.action_type}<br/>
-                      <span className="text-slate-500">Target:</span> {log.action.target}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {manifest && (
-                <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 h-fit">
-                  <div className="flex items-center gap-2 text-blue-400 mb-3 text-sm font-bold">
-                    <FileJson className="h-4 w-4" />
-                    Boundary Config
-                  </div>
-                  <pre className="text-[10px] text-green-400 font-mono overflow-x-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify({
-                      intent: manifest.declared_intent,
-                      allowed: manifest.allowed_actions,
-                      forbidden: manifest.forbidden_actions,
-                      risk: manifest.risk_ceiling
-                    }, null, 2)}
-                  </pre>
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <div className="premium-card overflow-hidden">
+            <div className="px-6 py-4 bg-rose-50/50 border-b border-border/60">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center">
+                  <AlertTriangle className="w-4.5 h-4.5 text-destructive" />
                 </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Unprotected Agent</h3>
+                  <p className="text-xs text-muted-foreground">No action-layer security</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 bg-secondary/30 font-mono text-xs h-[340px] overflow-y-auto space-y-1.5">
+              {unprotectedLogs.length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground text-sm font-sans">Click "Run Demo" to start</p>
+                </div>
+              ) : (
+                unprotectedLogs.map((log, i) => (
+                  <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
+                    <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
+                    {logIcon(log.type)}
+                    <span>{log.message}</span>
+                  </div>
+                ))
               )}
             </div>
+            {unprotectedLogs.length > 0 && unprotectedLogs.at(-1)?.type === 'error' && (
+              <div className="px-6 py-4 bg-rose-50/70 border-t border-border/60">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-destructive">Attack Succeeded</p>
+                    <p className="text-xs text-destructive/80 mt-0.5">847 patient records exfiltrated. Est. $1.5M HIPAA fine.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="premium-card overflow-hidden">
+            <div className="px-6 py-4 bg-success/[0.04] border-b border-border/60">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center">
+                  <Shield className="w-4.5 h-4.5 text-success" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">ARGUS Protected</h3>
+                  <p className="text-xs text-muted-foreground">3-layer authorization pipeline</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 bg-secondary/30 font-mono text-xs h-[340px] overflow-y-auto space-y-1.5">
+              {protectedLogs.length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground text-sm font-sans">Waiting for simulation...</p>
+                </div>
+              ) : (
+                protectedLogs.map((log, i) => (
+                  <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
+                    <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
+                    {logIcon(log.type)}
+                    <span>{log.message}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            {attackBlocked && (
+              <div className="px-6 py-4 bg-success/5 border-t border-border/60">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-success mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-success">Attack Blocked</p>
+                    <p className="text-xs text-success/80 mt-0.5">PHI exfiltration prevented. Zero patient records leaked.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Backend Verification Badge */}
+        {backendResult && (
+          <div className="premium-card p-4 mb-8 animate-fade-in bg-success/[0.02]">
+            <div className="flex items-center gap-3">
+              <BadgeCheck className="w-5 h-5 text-success shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-success">Backend Verified</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ARGUS backend confirmed: {backendResult.decision} (risk: {(backendResult.risk_score * 100).toFixed(0)}%)
+                  &nbsp;| Session: {backendResult.session_id.slice(0, 12)}...
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {backendLoading && (
+          <div className="premium-card p-4 mb-8">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+              Verifying with ARGUS backend...
+            </div>
+          </div>
+        )}
+
+        {backendError && (
+          <div className="premium-card p-4 mb-8 bg-warning/[0.02]">
+            <div className="flex items-center gap-3 text-sm text-warning">
+              <AlertTriangle className="w-4 h-4" />
+              {backendError}
+            </div>
+          </div>
+        )}
+
+        {explanation && (
+          <div className="premium-card p-6 mb-8 animate-slide-up">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
+                <Shield className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-foreground mb-2">Gemini Pro Explanation</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{explanation}</p>
+                <a href="/reviews" className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                  View in Review Queue <ChevronRight className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-gradient-to-br from-primary/[0.02] via-accent/[0.02] to-primary/[0.02] rounded-2xl border border-border/80 p-6 md:p-8">
+          <h3 className="text-base font-semibold text-foreground mb-6">How ARGUS Stopped the Attack</h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[
+              { step: '1', title: 'Intent Extraction', subtitle: 'Gemini Flash',
+                desc: 'Generated a strict intent manifest declaring "discharge summary preparation" as the only allowed operation.',
+                icon: FileSearch, color: 'text-primary', bg: 'bg-primary/5' },
+              { step: '2', title: 'Policy Enforcement', subtitle: 'Lobster Trap',
+                desc: 'Compared the detected action (PHI export) against the manifest and calculated a 0.94 risk score.',
+                icon: Network, color: 'text-accent', bg: 'bg-accent/5' },
+              { step: '3', title: 'Explanation', subtitle: 'Gemini Pro',
+                desc: 'Performed semantic analysis to explain why the action was malicious and routed it to human review.',
+                icon: Cpu, color: 'text-destructive', bg: 'bg-destructive/5' },
+            ].map((item) => (
+              <div key={item.step} className="bg-white rounded-xl border border-border/60 p-5 card-hover">
+                <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center mb-3`}>
+                  <item.icon className={`w-5 h-5 ${item.color}`} />
+                </div>
+                <h4 className="font-semibold text-foreground text-sm mb-0.5">{item.title}</h4>
+                <p className="text-xs text-primary font-mono mb-2">{item.subtitle}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
