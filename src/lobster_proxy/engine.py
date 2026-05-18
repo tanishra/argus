@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import os
 from dataclasses import dataclass, field
@@ -276,10 +277,9 @@ class LobsterTrapEngine:
         # Scope examples: "customer_complaints@inbox", "src/", "analytics_db"
 
         if "@" in scope:  # Email scope
-            if target and "@" in target:
-                # Extract domain from target
-                target_domain = target.split("@")[-1] if "@" in target else ""
-                scope_domain = scope.split("@")[-1] if "@" in scope else ""
+            if target and re.match(r'^[^@]+@[^@]+\.[^@]+$', target):
+                target_domain = target.split("@")[-1]
+                scope_domain = scope.split("@")[-1]
                 if target_domain and scope_domain and target_domain != scope_domain:
                     return f"Target domain '{target_domain}' outside scope '{scope}'"
 
@@ -430,7 +430,7 @@ class LobsterTrapEngine:
             return RiskThreshold.LOW
         elif score <= 0.7:
             return RiskThreshold.MEDIUM
-        elif score <= 0.9:
+        elif score < 0.9:
             return RiskThreshold.HIGH
         return RiskThreshold.CRITICAL
 

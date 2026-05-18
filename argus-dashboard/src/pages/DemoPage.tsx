@@ -302,7 +302,7 @@ export default function DemoPage() {
                 </div>
               ) : (
                 unprotectedLogs.map((log, i) => (
-                  <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
+                  <div key={`${log.timestamp}-${i}`} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
                     <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
                     {logIcon(log.type)}
                     <span>{log.message}</span>
@@ -342,7 +342,7 @@ export default function DemoPage() {
                 </div>
               ) : (
                 protectedLogs.map((log, i) => (
-                  <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
+                  <div key={`${log.timestamp}-${i}`} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
                     <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
                     {logIcon(log.type)}
                     <span>{log.message}</span>

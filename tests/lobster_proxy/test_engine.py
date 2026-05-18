@@ -397,4 +397,4 @@ class TestDetectedAction:
         assert data["target_type"] == "email"
 
 
-# Run with: pytest src/lobster_proxy/tests/test_engine.py -v
+# Run with: pytest tests/lobster_proxy/test_engine.py -v

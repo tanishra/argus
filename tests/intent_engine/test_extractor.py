@@ -279,4 +279,4 @@ class TestSyncIntentExtractor:
         sync_extractor.close()  # Should not raise
 
 
-# Run with: pytest src/intent_engine/tests/test_extractor.py -v
+# Run with: pytest tests/intent_engine/test_extractor.py -v

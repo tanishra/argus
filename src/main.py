@@ -6,6 +6,7 @@ FastAPI backend for the ARGUS pre-action authorization gateway.
 """
 
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -40,7 +41,7 @@ async def verify_api_key(request: Request) -> None:
         return
     api_key = request.headers.get("X-API-Key", "")
     expected = os.getenv("API_KEY", "")
-    if not expected or api_key != expected:
+    if not expected or not hmac.compare_digest(api_key, expected):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 # Global instances
