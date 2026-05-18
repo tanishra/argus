@@ -158,6 +158,7 @@ Desktop.ini
 *.csv
 *.json
 !sample.json
+!argus-dashboard/vercel.json
 uploads/
 temp/
 
