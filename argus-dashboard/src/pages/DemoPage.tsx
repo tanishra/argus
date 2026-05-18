@@ -307,13 +307,22 @@ export default function DemoPage() {
                 <p className="text-muted-foreground text-sm font-sans">Click "Run Demo" to start</p>
               </div>
             ) : (
-              unprotectedLogs.map((log, i) => (
-                <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
-                  <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
-                  {logIcon(log.type)}
-                  <span>{log.message}</span>
-                </div>
-              ))
+              (() => {
+                const logColors = { info: 'text-muted-foreground', success: 'text-success', warning: 'text-warning', error: 'text-destructive' }
+                const logIcons: Record<string, React.ReactNode> = {
+                  info: null,
+                  success: <CheckCircle2 className="w-3 h-3 text-success shrink-0 mt-0.5" />,
+                  warning: <AlertTriangle className="w-3 h-3 text-warning shrink-0 mt-0.5" />,
+                  error: <XCircle className="w-3 h-3 text-destructive shrink-0 mt-0.5" />,
+                }
+                return unprotectedLogs.map((log, i) => (
+                  <div key={i} className={`flex items-start gap-2 ${logColors[log.type]} transition-opacity animate-fade-in`}>
+                    <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
+                    {logIcons[log.type]}
+                    <span>{log.message}</span>
+                  </div>
+                ))
+              })()
             )}
           </div>
           {unprotectedLogs.length > 0 && unprotectedLogs.at(-1)?.type === 'error' && (
@@ -348,13 +357,22 @@ export default function DemoPage() {
                 <p className="text-muted-foreground text-sm font-sans">Waiting for simulation...</p>
               </div>
             ) : (
-              protectedLogs.map((log, i) => (
-                <div key={i} className={`flex items-start gap-2 ${logColor(log.type)} transition-opacity animate-fade-in`}>
-                  <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
-                  {logIcon(log.type)}
-                  <span>{log.message}</span>
-                </div>
-              ))
+              (() => {
+                const logColors = { info: 'text-muted-foreground', success: 'text-success', warning: 'text-warning', error: 'text-destructive' }
+                const logIcons: Record<string, React.ReactNode> = {
+                  info: null,
+                  success: <CheckCircle2 className="w-3 h-3 text-success shrink-0 mt-0.5" />,
+                  warning: <AlertTriangle className="w-3 h-3 text-warning shrink-0 mt-0.5" />,
+                  error: <XCircle className="w-3 h-3 text-destructive shrink-0 mt-0.5" />,
+                }
+                return protectedLogs.map((log, i) => (
+                  <div key={i} className={`flex items-start gap-2 ${logColors[log.type]} transition-opacity animate-fade-in`}>
+                    <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
+                    {logIcons[log.type]}
+                    <span>{log.message}</span>
+                  </div>
+                ))
+              })()
             )}
           </div>
           {attackBlocked && (
