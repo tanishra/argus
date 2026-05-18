@@ -26,6 +26,7 @@ from .human_gate import ReviewQueue
 from . import session_store
 from . import counters
 from . import event_bus
+from .logging_config import setup_logging, RequestLogMiddleware
 
 # Global instances
 _intent_extractor: Optional[IntentExtractor] = None
@@ -78,14 +79,17 @@ async def lifespan(app: FastAPI):
     global _intent_extractor, _explanation_engine, _lobster_proxy, _review_queue
 
     # Startup
+    setup_logging()
     _intent_extractor = IntentExtractor()
     _explanation_engine = ExplanationEngine()
     _lobster_proxy = LobsterTrapProxy()
     _review_queue = ReviewQueue()
+    await event_bus.start_sweeper()
 
     yield
 
     # Shutdown
+    await event_bus.stop_sweeper()
     if _intent_extractor:
         await _intent_extractor.close()
     if _explanation_engine:
@@ -108,6 +112,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request logging
+app.add_middleware(RequestLogMiddleware)
+
 
 # ============ Intent Engine Endpoints ============
 
@@ -129,7 +136,7 @@ async def extract_intent(request: IntentRequest):
 
     # Store manifest in session store so evaluate_action can retrieve it
     await session_store.save_manifest(result.manifest.session_id, result.manifest)
-    counters.increment_sessions()
+    await counters.increment_sessions()
 
     return {
         "session_id": result.manifest.session_id,
@@ -186,20 +193,20 @@ async def evaluate_action(request: ActionRequest):
         parameters=request.parameters or {}
     )
 
-    counters.increment_actions()
+    await counters.increment_actions()
 
     # Evaluate through Lobster Trap
     evaluation = _lobster_proxy.process_action(manifest, action)
-    counters.add_response_time(evaluation.evaluation_time_ms)
+    await counters.add_response_time(evaluation.evaluation_time_ms)
     
     if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
-        counters.increment_blocked()
+        await counters.increment_blocked()
     if evaluation.decision == Decision.QUARANTINE:
-        counters.increment_quarantined()
+        await counters.increment_quarantined()
     if evaluation.decision == Decision.ALLOW:
-        counters.increment_allowed()
+        await counters.increment_allowed()
     if evaluation.decision == Decision.QUARANTINE:
-        counters.increment_human_reviews()
+        await counters.increment_human_reviews()
 
     response = {
         "session_id": request.session_id,
@@ -340,12 +347,12 @@ async def simulate_attack(
 
     evaluation = _lobster_proxy.process_action(manifest, action)
 
-    counters.increment_actions()
-    counters.increment_attack_type(attack_type)
+    await counters.increment_actions()
+    await counters.increment_attack_type(attack_type)
     if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
-        counters.increment_blocked()
+        await counters.increment_blocked()
     if evaluation.decision == Decision.QUARANTINE:
-        counters.increment_quarantined()
+        await counters.increment_quarantined()
 
     response = {
         "attack_type": attack_type,
@@ -455,7 +462,7 @@ async def dashboard_feed():
     Provides live feed of actions, decisions, and alerts.
     """
     async def event_generator():
-        q = event_bus.subscribe()
+        q = await event_bus.subscribe()
         try:
             while True:
                 try:
@@ -463,8 +470,10 @@ async def dashboard_feed():
                     yield {"event": event["event_type"], "data": json.dumps(event["data"])}
                 except asyncio.TimeoutError:
                     yield {"event": "ping", "data": "{}"}
+        except GeneratorExit:
+            pass
         finally:
-            event_bus.unsubscribe(q)
+            await event_bus.unsubscribe(q)
 
     return EventSourceResponse(event_generator())
 
@@ -525,7 +534,7 @@ async def health_check():
 @app.post("/api/demo/reset")
 async def demo_reset(session_id: Optional[str] = None):
     """Reset all counters and optionally clear a session manifest."""
-    counters.reset_counters()
+    await counters.reset_counters()
     if session_id:
         await session_store.delete_manifest(session_id)
     return {"status": "reset", "session_cleared": session_id is not None}

@@ -1,3 +1,5 @@
+import asyncio
+from copy import deepcopy
 from dataclasses import dataclass
 from dataclasses import field
 
@@ -19,36 +21,46 @@ class SystemCounters:
         return self.total_response_time_ms / self.actions_today
 
 _counters = SystemCounters()
+_lock = asyncio.Lock()
 
 def get_counters() -> SystemCounters:
-    return _counters
+    return deepcopy(_counters)
 
-def increment_sessions():
-    _counters.total_sessions += 1
+async def increment_sessions():
+    async with _lock:
+        _counters.total_sessions += 1
 
-def increment_actions():
-    _counters.actions_today += 1
+async def increment_actions():
+    async with _lock:
+        _counters.actions_today += 1
 
-def increment_blocked():
-    _counters.blocked_actions += 1
+async def increment_blocked():
+    async with _lock:
+        _counters.blocked_actions += 1
 
-def increment_quarantined():
-    _counters.quarantined += 1
+async def increment_quarantined():
+    async with _lock:
+        _counters.quarantined += 1
 
-def add_response_time(ms: float):
-    _counters.total_response_time_ms += ms
-
-def reset_counters():
+async def reset_counters():
     global _counters
-    _counters = SystemCounters()
+    async with _lock:
+        _counters = SystemCounters()
 
-def increment_allowed():
-    _counters.allowed_actions += 1
+async def increment_allowed():
+    async with _lock:
+        _counters.allowed_actions += 1
 
-def increment_human_reviews():
-    _counters.human_reviews += 1
+async def increment_human_reviews():
+    async with _lock:
+        _counters.human_reviews += 1
 
-def increment_attack_type(attack_type: str):
-    _counters.attack_type_counts[attack_type] = (
-        _counters.attack_type_counts.get(attack_type, 0) + 1
-    )
+async def increment_attack_type(attack_type: str):
+    async with _lock:
+        _counters.attack_type_counts[attack_type] = (
+            _counters.attack_type_counts.get(attack_type, 0) + 1
+        )
+
+async def add_response_time(ms: float):
+    async with _lock:
+        _counters.total_response_time_ms += ms

@@ -54,7 +54,6 @@ coverage.xml
 .env.local
 .env.*.local
 *.env
-.env.example
 
 # IDEs
 .vscode/
@@ -162,8 +161,8 @@ uploads/
 temp/
 
 
-# ========== Keep These =========!
+# ========== Keep These =========
 
 # Keep these files in git
 !requirements.txt
-!.env.examplelobster-trap/
+!.env.example

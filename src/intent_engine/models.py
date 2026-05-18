@@ -200,9 +200,9 @@ class IntentManifest(BaseModel):
         if action_type in self.forbidden_actions:
             return False
 
-        # If allowed_actions is empty, everything is allowed (within risk ceiling)
+        # Empty allowed_actions means forbid everything (fail-secure per ADR-006)
         if not self.allowed_actions:
-            return True
+            return False
 
         # Otherwise, action must be in allowed list
         return action_type in self.allowed_actions
