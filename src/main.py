@@ -439,12 +439,14 @@ async def simulate_attack(
 
     evaluation = _lobster_proxy.process_action(manifest, action)
 
+    await counters.add_response_time(evaluation.evaluation_time_ms)
     await counters.increment_actions()
     await counters.increment_attack_type(attack_type)
     if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
         await counters.increment_blocked()
     if evaluation.decision == Decision.QUARANTINE:
         await counters.increment_quarantined()
+        await counters.increment_human_reviews()
 
     response = {
         "attack_type": attack_type,
@@ -492,7 +494,7 @@ async def get_lightweight_stats():
         "quarantined": c.quarantined,
         "allowed_actions": c.allowed_actions,
         "human_reviews": c.human_reviews,
-        "review_queue_size": 0,
+        "review_queue_size": (await _review_queue.get_statistics()).get("pending", 0),
         "avg_response_time_ms": round(c.avg_response_time_ms, 2),
         "threat_level": "high" if c.blocked_actions > 25 else "normal"
     }
