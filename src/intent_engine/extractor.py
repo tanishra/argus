@@ -106,7 +106,7 @@ class GeminiClient:
         client = await self._get_client()
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_config.model_name}:generateContent"
-        params = {"key": self.gemini_config.api_key}
+        headers = {"x-goog-api-key": self.gemini_config.api_key}
 
         payload = {
             "contents": [{
@@ -121,7 +121,7 @@ class GeminiClient:
 
         for attempt in range(self.gemini_config.max_retries):
             try:
-                response = await client.post(url, params=params, json=payload)
+                response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
 
                 result = response.json()

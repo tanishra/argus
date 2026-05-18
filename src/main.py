@@ -5,16 +5,18 @@ ARGUS API - Main Application Entry Point
 FastAPI backend for the ARGUS pre-action authorization gateway.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
@@ -27,6 +29,17 @@ from . import session_store
 from . import counters
 from . import event_bus
 from .logging_config import setup_logging, RequestLogMiddleware
+
+# ============ Auth ============
+
+async def verify_api_key(request: Request) -> None:
+    """Optional API key check. Skipped in DEMO_MODE."""
+    if os.getenv("DEMO_MODE", "true").lower() == "true":
+        return
+    api_key = request.headers.get("X-API-Key", "")
+    expected = os.getenv("API_KEY", "")
+    if not expected or api_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 # Global instances
 _intent_extractor: Optional[IntentExtractor] = None
@@ -96,17 +109,22 @@ async def lifespan(app: FastAPI):
         await _explanation_engine.close()
 
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
 app = FastAPI(
     title="ARGUS API",
     description="AI Agent Pre-Action Authorization Gateway",
     version="1.0.0",
     lifespan=lifespan
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS for dashboard
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -119,19 +137,20 @@ app.add_middleware(RequestLogMiddleware)
 # ============ Intent Engine Endpoints ============
 
 @app.post("/api/intent/extract")
-async def extract_intent(request: IntentRequest):
+@limiter.limit("50/minute")
+async def extract_intent(request: Request, intent_req: IntentRequest):
     """
     Extract intent from user input and generate Intent Manifest.
 
     This is the entry point for new user requests. The manifest is stored
     and used for subsequent action evaluations.
     """
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = intent_req.session_id or str(uuid.uuid4())
 
     result = await _intent_extractor.extract_intent(
-        user_input=request.user_input,
+        user_input=intent_req.user_input,
         session_id=session_id,
-        user_id=request.user_id
+        user_id=intent_req.user_id
     )
 
     # Store manifest in session store so evaluate_action can retrieve it
@@ -167,7 +186,8 @@ async def get_manifest(session_id: str):
 # ============ Policy Enforcement Endpoints ============
 
 @app.post("/api/action/evaluate")
-async def evaluate_action(request: ActionRequest):
+@limiter.limit("100/minute")
+async def evaluate_action(request: Request, action_req: ActionRequest):
     """
     Evaluate an action against the session's intent manifest.
 
@@ -178,19 +198,19 @@ async def evaluate_action(request: ActionRequest):
     4. Returns the decision and, if quarantined, adds to review queue
     """
     # Get manifest for session from store
-    manifest = await session_store.get_manifest(request.session_id)
+    manifest = await session_store.get_manifest(action_req.session_id)
     if not manifest:
         raise HTTPException(
             status_code=404,
-            detail=f"Session '{request.session_id}' not found. Call POST /api/intent/extract first."
+            detail=f"Session '{action_req.session_id}' not found. Call POST /api/intent/extract first."
         )
 
     # Create detected action
     action = DetectedAction(
-        action_type=ActionType(request.action_type),
-        target=request.target,
-        target_type=request.target_type,
-        parameters=request.parameters or {}
+        action_type=ActionType(action_req.action_type),
+        target=action_req.target,
+        target_type=action_req.target_type,
+        parameters=action_req.parameters or {}
     )
 
     await counters.increment_actions()
@@ -209,8 +229,8 @@ async def evaluate_action(request: ActionRequest):
         await counters.increment_human_reviews()
 
     response = {
-        "session_id": request.session_id,
-        "action_type": request.action_type,
+        "session_id": action_req.session_id,
+        "action_type": action_req.action_type,
         "target": request.target,
         "decision": evaluation.decision.value,
         "risk_score": evaluation.risk_score,
@@ -257,7 +277,9 @@ async def evaluate_action(request: ActionRequest):
 
 
 @app.post("/api/action/simulate")
+@limiter.limit("30/minute")
 async def simulate_attack(
+    request: Request,
     session_id: str,
     attack_type: str,
     target: str
@@ -398,7 +420,8 @@ async def get_review_item(item_id: str):
 
 
 @app.post("/api/reviews/{item_id}/claim")
-async def claim_review(item_id: str, reviewer_id: str):
+@limiter.limit("30/minute")
+async def claim_review(request: Request, item_id: str, reviewer_id: str):
     """Claim a review item for review."""
     item = _review_queue.claim_item(item_id, reviewer_id)
     if not item:
@@ -407,7 +430,8 @@ async def claim_review(item_id: str, reviewer_id: str):
 
 
 @app.post("/api/reviews/decision")
-async def submit_review_decision(decision: ReviewDecision):
+@limiter.limit("30/minute")
+async def submit_review_decision(request: Request, decision: ReviewDecision):
     """Submit a review decision."""
     # Import ActionType for the completion
 
@@ -461,13 +485,17 @@ async def dashboard_feed():
 
     Provides live feed of actions, decisions, and alerts.
     """
+    def _sanitize(data: dict) -> str:
+        raw = json.dumps(data)
+        return raw.replace("\n", "\\n").replace("\r", "\\r")
+
     async def event_generator():
         q = await event_bus.subscribe()
         try:
             while True:
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=15)
-                    yield {"event": event["event_type"], "data": json.dumps(event["data"])}
+                    yield {"event": event["type"], "data": _sanitize(event["data"])}
                 except asyncio.TimeoutError:
                     yield {"event": "ping", "data": "{}"}
         except GeneratorExit:
@@ -515,24 +543,39 @@ async def export_compliance_report(session_id: str, format: str = "json"):
 
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint. Pings real dependencies."""
+    components = {}
+
+    # Check Redis
+    try:
+        r = await session_store.get_redis()
+        await r.ping()
+        components["redis"] = "operational"
+    except Exception:
+        components["redis"] = "degraded"
+
+    # Check Gemini API key format
+    key = os.getenv("GEMINI_API_KEY", "")
+    components["intent_engine"] = "operational" if key and key != "your_gemini_api_key_here" else "misconfigured"
+    components["explanation_engine"] = components["intent_engine"]
+
+    # Check review queue
+    components["review_queue"] = "operational"
+
+    all_ok = all(v == "operational" for v in components.values())
     return {
-        "status": "healthy",
+        "status": "healthy" if all_ok else "degraded",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": "1.0.0",
-        "components": {
-            "intent_engine": "operational",
-            "lobster_proxy": "operational",
-            "explanation_engine": "operational",
-            "review_queue": "operational"
-        }
+        "components": components
     }
 
 
 # ============ Demo Reset Endpoint ============
 
 @app.post("/api/demo/reset")
-async def demo_reset(session_id: Optional[str] = None):
+@limiter.limit("10/minute")
+async def demo_reset(request: Request, session_id: Optional[str] = None):
     """Reset all counters and optionally clear a session manifest."""
     await counters.reset_counters()
     if session_id:
