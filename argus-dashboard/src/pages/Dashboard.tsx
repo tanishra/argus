@@ -103,7 +103,7 @@ export default function Dashboard() {
             using intent-driven policy enforcement.
           </p>
 
-          <p className="text-xs text-muted-foreground/60 italic mb-8 -mt-4 animate-slide-up" style={{ animationDelay: '0.15s' }}>
+          <p className="text-sm text-muted-foreground/90 font-medium italic mb-8 -mt-4 pl-4 border-l-2 border-primary/30 animate-slide-up" style={{ animationDelay: '0.15s' }}>
             Agents have passwords. Now they have permission slips.
           </p>
 

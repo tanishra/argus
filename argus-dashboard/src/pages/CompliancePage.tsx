@@ -13,9 +13,7 @@ export default function CompliancePage() {
             Generate reports to meet regulatory and enterprise audit requirements.
           </p>
         </div>
-        <div className="max-w-4xl">
-          <ComplianceReport />
-        </div>
+        <ComplianceReport />
       </div>
     </div>
   )
