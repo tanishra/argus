@@ -51,10 +51,37 @@ export function ComplianceReport() {
   const handleExport = async (format: string) => {
     setExporting(format)
     setExportError(null)
+    const sessionId = import.meta.env.VITE_DEMO_SESSION_ID || 'demo_session_001'
+
+    if (format === 'json') {
+      try {
+        const res = await api.exportComplianceReport(sessionId, format) as unknown as BackendReport
+        setReport(mapReport(res))
+      } catch {
+        setExportError('Failed to fetch compliance data from backend')
+      } finally {
+        setExporting(null)
+      }
+      return
+    }
+
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const url = `${baseUrl}/api/compliance/export/${sessionId}?format=${format}`
+
     try {
-      const sessionId = import.meta.env.VITE_DEMO_SESSION_ID || 'demo_session_001'
-      const res = await api.exportComplianceReport(sessionId, format) as unknown as BackendReport
-      setReport(mapReport(res))
+      if (format === 'pdf') {
+        window.open(url, '_blank')
+      } else {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error()
+        const blob = await res.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = `argus-compliance-${sessionId}.csv`
+        a.click()
+        URL.revokeObjectURL(blobUrl)
+      }
     } catch {
       setExportError('Failed to fetch compliance data from backend')
     } finally {
