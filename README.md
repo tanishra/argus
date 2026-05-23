@@ -53,6 +53,11 @@ cd argus
 uv sync --dev
 cp .env.example .env
 # Add your GEMINI_API_KEY to .env (get from https://aistudio.google.com/)
+
+# (Optional) Seed the dashboard with realistic telemetry data
+uv run seed_data.py
+
+# Start the backend server
 uv run uvicorn src.main:app --reload --port 8000
 
 # Frontend (separate terminal)
