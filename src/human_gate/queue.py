@@ -125,9 +125,9 @@ class ReviewItem:
             recommended_action=data.get("recommended_action", ""),
             assigned_reviewer=data.get("assigned_reviewer"),
             reviewed_by=data.get("reviewed_by"),
-            reviewed_at=datetime.fromisoformat(data["reviewed_at"])
-            if data.get("reviewed_at")
-            else None,
+            reviewed_at=(
+                datetime.fromisoformat(data["reviewed_at"]) if data.get("reviewed_at") else None
+            ),
             decision=data.get("decision"),
             reviewer_notes=data.get("reviewer_notes", ""),
             sla_hours=data.get("sla_hours", 24),

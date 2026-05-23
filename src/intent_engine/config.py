@@ -14,11 +14,11 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class GeminiConfig(BaseModel):
-    """Gemini API configuration."""
+class LLMConfig(BaseModel):
+    """LiteLLM configuration."""
 
     api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    model_name: str = Field(default="gemini-2.5-flash")
+    model_name: str = Field(default="gemini/gemini-2.5-flash")
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     max_tokens: int = Field(default=8192)
     timeout_seconds: int = Field(default=60)
@@ -28,7 +28,7 @@ class GeminiConfig(BaseModel):
 class IntentEngineConfig(BaseModel):
     """Main configuration for Intent Engine."""
 
-    gemini: GeminiConfig = Field(default_factory=GeminiConfig)
+    llm: LLMConfig = Field(default_factory=LLMConfig)
     latency_target_ms: float = Field(default=300.0)
     confidence_threshold_high: float = Field(default=0.8)
     confidence_threshold_low: float = Field(default=0.5)
@@ -89,10 +89,15 @@ IMPORTANT:
 
 def load_config() -> IntentEngineConfig:
     """Load configuration from environment and defaults."""
+
+    # We still read GEMINI_API_KEY for backward compatibility,
+    # but litellm natively reads OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
     return IntentEngineConfig(
-        gemini=GeminiConfig(
+        llm=LLMConfig(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model_name=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            model_name=os.getenv(
+                "ARGUS_LLM_MODEL", os.getenv("GEMINI_MODEL", "gemini/gemini-2.5-flash")
+            ),
             temperature=0.1,
             max_tokens=8192,
             timeout_seconds=60,

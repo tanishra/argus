@@ -14,11 +14,11 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class GeminiProConfig(BaseModel):
-    """Gemini Pro API configuration."""
+class LLMConfig(BaseModel):
+    """LiteLLM configuration."""
 
     api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    model_name: str = Field(default="gemini-2.5-pro")
+    model_name: str = Field(default="gemini/gemini-2.5-pro")
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
     max_tokens: int = Field(default=8192)
     timeout_seconds: int = Field(default=60)
@@ -28,7 +28,7 @@ class GeminiProConfig(BaseModel):
 class ExplanationEngineConfig(BaseModel):
     """Main configuration for Explanation Engine."""
 
-    gemini_pro: GeminiProConfig = Field(default_factory=GeminiProConfig)
+    llm: LLMConfig = Field(default_factory=LLMConfig)
     latency_target_ms: float = Field(default=2000.0)
     enable_deep_analysis: bool = Field(default=True)
     include_remediation_suggestions: bool = Field(default=True)
@@ -98,9 +98,11 @@ Provide a brief, clear explanation."""
 def load_config() -> ExplanationEngineConfig:
     """Load configuration from environment and defaults."""
     return ExplanationEngineConfig(
-        gemini_pro=GeminiProConfig(
+        llm=LLMConfig(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model_name=os.getenv("GEMINI_PRO_MODEL", "gemini-2.5-pro"),
+            model_name=os.getenv(
+                "ARGUS_PRO_MODEL", os.getenv("GEMINI_PRO_MODEL", "gemini/gemini-2.5-pro")
+            ),
             temperature=0.3,
             max_tokens=8192,
             timeout_seconds=60,

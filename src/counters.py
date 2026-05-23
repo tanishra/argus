@@ -11,7 +11,13 @@ class SystemCounters:
     quarantined: int = 8
     allowed_actions: int = 8909
     human_reviews: int = 8
-    attack_type_counts: dict = field(default_factory=lambda: {"prompt_injection": 12, "phi_exfiltration": 8, "system_tampering": 4})
+    attack_type_counts: dict = field(
+        default_factory=lambda: {
+            "prompt_injection": 12,
+            "phi_exfiltration": 8,
+            "system_tampering": 4,
+        }
+    )
     total_response_time_ms: float = 8941 * 42.5
 
     @property

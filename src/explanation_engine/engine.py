@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import httpx
+import litellm
+from litellm.exceptions import RateLimitError, APIConnectionError, APIError
 
 from ..intent_engine.models import IntentManifest
 from ..lobster_proxy.engine import DetectedAction, PolicyEvaluation
@@ -42,75 +44,68 @@ class MismatchExplanation:
     raw_model_output: Optional[str] = None
 
 
-class GeminiProClient:
-    """Async client for Gemini Pro API calls."""
+class LLMProClient:
+    """Model-agnostic async client using LiteLLM."""
 
     def __init__(self, config: ExplanationEngineConfig):
         self.config = config
-        self.gemini_config = config.gemini_pro
-        self._client: Optional[httpx.AsyncClient] = None
+        self.llm_config = config.llm
 
-    async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client."""
-        if self._client is None:
-            self._client = httpx.AsyncClient(
-                timeout=httpx.Timeout(self.gemini_config.timeout_seconds)
-            )
-        return self._client
+        # Configure LiteLLM globally
+        litellm.drop_params = True
+        litellm.telemetry = False
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """No-op for LiteLLM as it manages its own HTTP clients."""
+        pass
 
     async def generate_content(
         self, prompt: str, temperature: float = 0.3, max_tokens: int = 1024
     ) -> str:
         """
-        Call Gemini Pro API to generate explanation.
-
-        Args:
-            prompt: The prompt to send to Gemini Pro
-            temperature: Sampling temperature (0.0-2.0)
-            max_tokens: Maximum tokens in response
-
-        Returns:
-            Raw text response from Gemini Pro
+        Call LLM via LiteLLM to generate explanation.
         """
-        client = await self._get_client()
+        model = self.llm_config.model_name
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_config.model_name}:generateContent"
-        headers = {"x-goog-api-key": self.gemini_config.api_key}
-
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
+        kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": self.llm_config.timeout_seconds,
         }
 
-        for attempt in range(self.gemini_config.max_retries):
+        if self.llm_config.api_key and model.startswith("gemini"):
+            kwargs["api_key"] = self.llm_config.api_key
+
+        is_openai = model.startswith("gpt") or "openai" in model
+        is_gemini_json = model.startswith("gemini")
+        if is_openai or is_gemini_json:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        for attempt in range(self.llm_config.max_retries):
             try:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
+                response = await litellm.acompletion(**kwargs)
 
-                result = response.json()
+                if response and response.choices:
+                    content = response.choices[0].message.content
+                    if content:
+                        return content.strip()
 
-                if "candidates" in result and len(result["candidates"]) > 0:
-                    candidate = result["candidates"][0]
-                    if "content" in candidate and "parts" in candidate["content"]:
-                        parts = candidate["content"]["parts"]
-                        if parts and "text" in parts[0]:
-                            return parts[0]["text"]
+                raise RuntimeError("Unexpected LLM response format or empty response")
 
-                raise RuntimeError("Unexpected Gemini Pro response format")
-
-            except httpx.HTTPError:
-                if attempt < self.gemini_config.max_retries - 1:
+            except (RateLimitError, APIConnectionError, APIError) as e:
+                if attempt < self.llm_config.max_retries - 1:
                     await asyncio.sleep(2**attempt)
                     continue
                 raise RuntimeError(
-                    f"Gemini Pro API call failed after {self.gemini_config.max_retries} attempts"
+                    f"LLM API call failed after {self.llm_config.max_retries} attempts: {str(e)}"
                 )
+            except Exception as e:
+                if attempt < self.llm_config.max_retries - 1:
+                    await asyncio.sleep(2**attempt)
+                    continue
+                raise RuntimeError(f"Unexpected LLM error: {str(e)}")
 
 
 logger = logging.getLogger("argus.explanation_engine")
@@ -127,11 +122,11 @@ class ExplanationEngine:
     def __init__(self, config: Optional[ExplanationEngineConfig] = None):
         self.config = config or get_config()
         self.prompt_config = get_prompt_config()
-        self.gemini = GeminiProClient(self.config)
+        self.llm = LLMProClient(self.config)
 
     async def close(self) -> None:
         """Close resources."""
-        await self.gemini.close()
+        await self.llm.close()
 
     async def explain_mismatch(
         self,
@@ -165,10 +160,10 @@ class ExplanationEngine:
             )
 
         try:
-            # Generate detailed explanation using Gemini Pro
+            # Generate detailed explanation using LiteLLM
             prompt = self._build_mismatch_prompt(manifest, detected_action, evaluation)
 
-            raw_output = await self.gemini.generate_content(
+            raw_output = await self.llm.generate_content(
                 prompt=prompt,
                 temperature=self.prompt_config.temperature,
                 max_tokens=self.prompt_config.max_output_tokens,
@@ -259,7 +254,11 @@ class ExplanationEngine:
         lines = [line.strip() for line in raw_output.split("\n") if line.strip()]
 
         # Strip common AI chat prefixes
-        if lines and ("of course" in lines[0].lower() or "here is" in lines[0].lower() or "sure" in lines[0].lower()):
+        if lines and (
+            "of course" in lines[0].lower()
+            or "here is" in lines[0].lower()
+            or "sure" in lines[0].lower()
+        ):
             lines = lines[1:]
 
         summary = lines[0] if lines else "Mismatch detected"
@@ -333,9 +332,7 @@ class ExplanationEngine:
         )
 
         try:
-            return await self.gemini.generate_content(
-                prompt=prompt, temperature=0.2, max_tokens=256
-            )
+            return await self.llm.generate_content(prompt=prompt, temperature=0.2, max_tokens=256)
         except Exception:
             logger.warning("Fallback to template explanation for '%s' on '%s'", action_type, target)
             return f"Action '{action_type}' targeting '{target}' flagged: {reason}"

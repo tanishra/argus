@@ -19,6 +19,8 @@ from collections import OrderedDict
 from typing import Optional
 
 import httpx
+import litellm
+from litellm.exceptions import RateLimitError, APIConnectionError, APIError
 
 from .config import IntentEngineConfig, get_config, get_extraction_config
 from .models import (
@@ -67,89 +69,76 @@ class IntentCache:
         self._cache.clear()
 
 
-class GeminiClient:
-    """Async client for Gemini API calls."""
+class LLMClient:
+    """Model-agnostic async client using LiteLLM."""
 
     def __init__(self, config: IntentEngineConfig):
         self.config = config
-        self.gemini_config = config.gemini
-        self._client: Optional[httpx.AsyncClient] = None
+        self.llm_config = config.llm
 
-    async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client."""
-        if self._client is None:
-            self._client = httpx.AsyncClient(
-                timeout=httpx.Timeout(self.gemini_config.timeout_seconds)
-            )
-        return self._client
+        # Configure LiteLLM globally
+        litellm.drop_params = (
+            True  # Drops unsupported params (like safetySettings) for non-Gemini models
+        )
+        litellm.telemetry = False
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """No-op for LiteLLM as it manages its own HTTP clients."""
+        pass
 
     async def generate_content(
         self, prompt: str, temperature: float = 0.1, max_tokens: int = 512
     ) -> str:
         """
-        Call Gemini API to generate content.
-
-        Args:
-            prompt: The prompt to send to Gemini
-            temperature: Sampling temperature (0.0-2.0)
-            max_tokens: Maximum tokens in response
-
-        Returns:
-            Raw text response from Gemini
-
-        Raises:
-            RuntimeError: If API call fails
+        Call LLM via LiteLLM to generate content.
         """
-        client = await self._get_client()
+        model = self.llm_config.model_name
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_config.model_name}:generateContent"
-        headers = {"x-goog-api-key": self.gemini_config.api_key}
-
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": max_tokens,
-                "responseMimeType": "application/json",
-            },
-            "safetySettings": [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ],
+        # Build API kwargs dynamically
+        kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": self.llm_config.timeout_seconds,
         }
 
-        for attempt in range(self.gemini_config.max_retries):
+        # If a custom Gemini API key is provided and we are using a Gemini model, pass it.
+        # Otherwise, LiteLLM natively picks up environment variables (GEMINI_API_KEY, OPENAI_API_KEY, etc.)
+        if self.llm_config.api_key and model.startswith("gemini"):
+            kwargs["api_key"] = self.llm_config.api_key
+
+        # Set up a structured JSON response format if supported by provider
+        is_openai = model.startswith("gpt") or "openai" in model
+        is_gemini_json = model.startswith("gemini")
+        if is_openai or is_gemini_json:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        for attempt in range(self.llm_config.max_retries):
             try:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
+                response = await litellm.acompletion(**kwargs)
 
-                result = response.json()
+                # Extract content
+                if response and response.choices:
+                    content = response.choices[0].message.content
+                    if content:
+                        return content.strip()
 
-                # Extract text from response
-                if "candidates" in result and len(result["candidates"]) > 0:
-                    candidate = result["candidates"][0]
-                    if "content" in candidate and "parts" in candidate["content"]:
-                        parts = candidate["content"]["parts"]
-                        if parts and "text" in parts[0]:
-                            return parts[0]["text"]
+                raise RuntimeError("Unexpected LLM response format or empty response")
 
-                raise RuntimeError("Unexpected Gemini response format")
-
-            except httpx.HTTPError:
-                if attempt < self.gemini_config.max_retries - 1:
+            except (RateLimitError, APIConnectionError, APIError) as e:
+                if attempt < self.llm_config.max_retries - 1:
                     await asyncio.sleep(2**attempt)  # Exponential backoff
                     continue
                 raise RuntimeError(
-                    f"Gemini API call failed after {self.gemini_config.max_retries} retries"
+                    f"LLM API call failed after {self.llm_config.max_retries} retries: {str(e)}"
                 )
+            except Exception as e:
+                # Catch-all for other unhandled library errors
+                if attempt < self.llm_config.max_retries - 1:
+                    await asyncio.sleep(2**attempt)
+                    continue
+                raise RuntimeError(f"Unexpected LLM error: {str(e)}")
 
 
 class IntentExtractor:
@@ -163,12 +152,12 @@ class IntentExtractor:
     def __init__(self, config: Optional[IntentEngineConfig] = None):
         self.config = config or get_config()
         self.extraction_config = get_extraction_config()
-        self.gemini = GeminiClient(self.config)
+        self.llm = LLMClient(self.config)
         self.cache = IntentCache(ttl_seconds=self.config.cache_ttl_seconds)
 
     async def close(self) -> None:
         """Close resources."""
-        await self.gemini.close()
+        await self.llm.close()
 
     async def extract_intent(
         self, user_input: str, session_id: str, user_id: Optional[str] = None
@@ -206,8 +195,8 @@ class IntentExtractor:
         prompt = self.extraction_config.full_system_prompt.format(user_input=user_input)
 
         try:
-            # Call Gemini
-            raw_output = await self.gemini.generate_content(
+            # Call LLM
+            raw_output = await self.llm.generate_content(
                 prompt=prompt,
                 temperature=self.extraction_config.temperature,
                 max_tokens=self.extraction_config.max_output_tokens,
@@ -247,6 +236,7 @@ class IntentExtractor:
 
         except Exception as e:
             import traceback
+
             traceback.print_exc()
             # Fail-secure: return conservative manifest on any error
             warnings.append(f"Extraction failed — using conservative fallback: {e}")

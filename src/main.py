@@ -36,10 +36,15 @@ from . import audit, counters, database, event_bus, session_store  # noqa: E402
 from .explanation_engine import ExplanationEngine  # noqa: E402
 from .human_gate import ReviewQueue  # noqa: E402
 from .intent_engine import ActionType, IntentExtractor, IntentManifest  # noqa: E402
-from .intent_engine.config import GeminiConfig  # noqa: E402
-from .intent_engine.extractor import GeminiClient  # noqa: E402
+from .intent_engine.config import LLMConfig  # noqa: E402
+from .intent_engine.extractor import LLMClient  # noqa: E402
 from .lobster_proxy import Decision, DetectedAction, LobsterTrapProxy  # noqa: E402
-from .logging_config import LogCorrelationMiddleware, RequestLogMiddleware, setup_logging  # noqa: E402
+from .logging_config import (
+    LogCorrelationMiddleware,
+    RequestLogMiddleware,
+    setup_logging,
+)  # noqa: E402
+
 # isort: on
 
 # ============ Auth ============
@@ -89,11 +94,20 @@ Common action types: read_email, send_email, forward_email, read_file, write_fil
 
 
 async def call_agent_gemini(user_input: str) -> dict:
-    """Call Gemini Flash as an unguarded agent to decide what action to take."""
-    gemini_config = GeminiConfig()
-    client = GeminiClient(
-        type("Config", (), {"gemini": gemini_config, "gemini_config": gemini_config})()
+    """Call LLM via LiteLLM as an unguarded agent to decide what action to take."""
+    # Build a generic LLMConfig
+    llm_config = LLMConfig(
+        model_name=os.getenv(
+            "ARGUS_LLM_MODEL", os.getenv("GEMINI_MODEL", "gemini/gemini-2.5-flash")
+        ),
+        api_key=os.getenv("GEMINI_API_KEY", ""),
     )
+
+    # Create an IntentEngineConfig wrapper dynamically
+    class DummyConfig:
+        llm = llm_config
+
+    client = LLMClient(DummyConfig())
     try:
         prompt = AGENT_PROMPT_TEMPLATE.format(user_input=user_input)
         raw = await client.generate_content(prompt, temperature=0.7, max_tokens=8192)
@@ -112,6 +126,7 @@ async def call_agent_gemini(user_input: str) -> dict:
         }
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         return {
             "raw_response": f"Agent call failed or returned invalid JSON: {e}",
@@ -181,10 +196,23 @@ def validate_environment():
     logger = logging.getLogger("argus.startup")
 
     gemini_key = os.getenv("GEMINI_API_KEY", "")
-    if not gemini_key or gemini_key == "your_gemini_api_key_here":
-        logger.warning("GEMINI_API_KEY not set or still using placeholder — Gemini calls will fail")
-    elif len(gemini_key) < 10:
-        logger.warning("GEMINI_API_KEY looks too short — may be invalid")
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+
+    if not any([gemini_key, openai_key, anthropic_key]):
+        logger.warning(
+            "No LLM API Key set (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY). LLM evaluations will fail unless mock modes are active."
+        )
+    else:
+        # Just logging which providers we found configured
+        configured_providers = []
+        if gemini_key:
+            configured_providers.append("Gemini")
+        if openai_key:
+            configured_providers.append("OpenAI")
+        if anthropic_key:
+            configured_providers.append("Anthropic")
+        logger.info(f"Configured LLM providers found: {', '.join(configured_providers)}")
 
     demo_mode = os.getenv("DEMO_MODE", "true").lower() == "true"
     if not demo_mode:
@@ -719,7 +747,9 @@ async def playground_evaluate(
                 "target": agent_response["target"],
                 "target_type": agent_response["target_type"],
             },
-            "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            "model": os.getenv(
+                "ARGUS_LLM_MODEL", os.getenv("GEMINI_MODEL", "gemini/gemini-2.5-flash")
+            ),
         },
         "policy": {
             "latency_ms": step3_ms,
@@ -1037,11 +1067,18 @@ async def health_check():
     except Exception:
         components["redis"] = "degraded"
 
-    # Check Gemini API key format
-    key = os.getenv("GEMINI_API_KEY", "")
-    components["intent_engine"] = (
-        "operational" if key and key != "your_gemini_api_key_here" else "misconfigured"
+    # Check LLM key formats
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+    has_key = any(
+        [
+            gemini_key and gemini_key != "your_gemini_api_key_here",
+            openai_key and openai_key != "your_openai_api_key_here",
+            anthropic_key and anthropic_key != "your_anthropic_api_key_here",
+        ]
     )
+    components["intent_engine"] = "operational" if has_key else "misconfigured"
     components["explanation_engine"] = components["intent_engine"]
 
     # Check review queue
