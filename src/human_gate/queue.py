@@ -16,27 +16,28 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 
-
-from ..intent_engine.models import IntentManifest, ActionType
 from .. import database
+from ..intent_engine.models import ActionType, IntentManifest
 
 logger = logging.getLogger("argus.review_queue")
-from ..lobster_proxy.engine import DetectedAction, PolicyEvaluation, Decision
+from ..lobster_proxy.engine import Decision, DetectedAction, PolicyEvaluation  # noqa: E402
 
 
 class ReviewStatus(str, Enum):
     """Status of a review item."""
-    PENDING = "pending"          # Awaiting review
-    IN_REVIEW = "in_review"      # Currently being reviewed
-    APPROVED = "approved"        # Action approved by reviewer
-    DENIED = "denied"           # Action denied by reviewer
-    ESCALATED = "escalated"      # Escalated to higher authority
-    EXPIRED = "expired"          # Timed out without decision
-    CANCELLED = "cancelled"      # Cancelled by system
+
+    PENDING = "pending"  # Awaiting review
+    IN_REVIEW = "in_review"  # Currently being reviewed
+    APPROVED = "approved"  # Action approved by reviewer
+    DENIED = "denied"  # Action denied by reviewer
+    ESCALATED = "escalated"  # Escalated to higher authority
+    EXPIRED = "expired"  # Timed out without decision
+    CANCELLED = "cancelled"  # Cancelled by system
 
 
 class ReviewPriority(str, Enum):
     """Priority levels for review items."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -52,6 +53,7 @@ class ReviewItem:
     Contains all information needed for a security analyst to
     make an informed decision about a quarantined action.
     """
+
     # Identity
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -108,7 +110,7 @@ class ReviewItem:
             "deadline": self.deadline.isoformat() if self.deadline else None,
             "sla_hours": self.sla_hours,
             "escalated_at": self.escalated_at.isoformat() if self.escalated_at else None,
-            "audit_log": self.audit_log
+            "audit_log": self.audit_log,
         }
 
     @classmethod
@@ -123,11 +125,13 @@ class ReviewItem:
             recommended_action=data.get("recommended_action", ""),
             assigned_reviewer=data.get("assigned_reviewer"),
             reviewed_by=data.get("reviewed_by"),
-            reviewed_at=datetime.fromisoformat(data["reviewed_at"]) if data.get("reviewed_at") else None,
+            reviewed_at=datetime.fromisoformat(data["reviewed_at"])
+            if data.get("reviewed_at")
+            else None,
             decision=data.get("decision"),
             reviewer_notes=data.get("reviewer_notes", ""),
             sla_hours=data.get("sla_hours", 24),
-            audit_log=data.get("audit_log", [])
+            audit_log=data.get("audit_log", []),
         )
 
         # Parse timestamps
@@ -144,16 +148,18 @@ class ReviewItem:
 
         if data.get("detected_action"):
             from ..lobster_proxy.engine import DetectedAction
+
             da_data = data["detected_action"]
             item.detected_action = DetectedAction(
                 action_type=ActionType(da_data["action_type"]),
                 target=da_data["target"],
                 target_type=da_data.get("target_type", "unknown"),
-                parameters=da_data.get("parameters", {})
+                parameters=da_data.get("parameters", {}),
             )
 
         if data.get("evaluation"):
             from ..lobster_proxy.engine import PolicyEvaluation, RiskThreshold
+
             ev_data = data["evaluation"]
             item.evaluation = PolicyEvaluation(
                 decision=Decision(ev_data["decision"]),
@@ -161,19 +167,21 @@ class ReviewItem:
                 risk_level=RiskThreshold(ev_data["risk_level"]),
                 reason=ev_data.get("reason", ""),
                 mismatches=ev_data.get("mismatches", []),
-                evidence=ev_data.get("evidence", {})
+                evidence=ev_data.get("evidence", {}),
             )
 
         return item
 
     def add_audit_entry(self, action: str, actor: str, details: str = "") -> None:
         """Add entry to audit log."""
-        self.audit_log.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "action": action,
-            "actor": actor,
-            "details": details
-        })
+        self.audit_log.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "action": action,
+                "actor": actor,
+                "details": details,
+            }
+        )
 
     def is_overdue(self) -> bool:
         """Check if review is overdue."""
@@ -252,7 +260,7 @@ class ReviewQueue:
         explanation_summary: str = "",
         explanation_details: str = "",
         recommended_action: str = "",
-        priority: Optional[ReviewPriority] = None
+        priority: Optional[ReviewPriority] = None,
     ) -> ReviewItem:
         async with self._lock:
             if priority is None:
@@ -270,7 +278,7 @@ class ReviewQueue:
                 explanation_details=explanation_details,
                 recommended_action=recommended_action,
                 deadline=deadline,
-                sla_hours=sla_hours
+                sla_hours=sla_hours,
             )
 
             self._items[item.id] = item
@@ -307,12 +315,13 @@ class ReviewQueue:
             ReviewPriority.URGENT: 4,
             ReviewPriority.HIGH: 8,
             ReviewPriority.NORMAL: 24,
-            ReviewPriority.LOW: 72
+            ReviewPriority.LOW: 72,
         }
         return sla_map.get(priority, 24)
 
     def _sort_pending_list(self) -> None:
         """Sort pending items by priority and time."""
+
         def sort_key(item_id: str) -> tuple:
             item = self._items.get(item_id)
             if not item:
@@ -323,7 +332,7 @@ class ReviewQueue:
                 ReviewPriority.URGENT: 1,
                 ReviewPriority.HIGH: 2,
                 ReviewPriority.NORMAL: 3,
-                ReviewPriority.LOW: 4
+                ReviewPriority.LOW: 4,
             }
 
             return (
@@ -336,8 +345,11 @@ class ReviewQueue:
     async def get_pending(self, limit: Optional[int] = None) -> list[ReviewItem]:
         """Get pending items, optionally limited."""
         async with self._lock:
-            items = [self._items[i] for i in self._pending_list
-                     if self._items[i].status == ReviewStatus.PENDING]
+            items = [
+                self._items[i]
+                for i in self._pending_list
+                if self._items[i].status == ReviewStatus.PENDING
+            ]
             return items[:limit] if limit else items
 
     async def get_item(self, item_id: str) -> Optional[ReviewItem]:
@@ -363,11 +375,7 @@ class ReviewQueue:
         return item
 
     async def complete_review(
-        self,
-        item_id: str,
-        reviewer_id: str,
-        decision: str,
-        notes: str = ""
+        self, item_id: str, reviewer_id: str, decision: str, notes: str = ""
     ) -> Optional[ReviewItem]:
         async with self._lock:
             item = self._items.get(item_id)
@@ -443,7 +451,7 @@ class ReviewQueue:
                 "approved": approved,
                 "denied": denied,
                 "overdue": overdue,
-                "pending_list": self._pending_list.copy()
+                "pending_list": self._pending_list.copy(),
             }
 
     async def get_completed(self, limit: Optional[int] = None) -> list[ReviewItem]:
@@ -478,7 +486,7 @@ class ReviewQueue:
                 "risk_score": item.evaluation.risk_score if item.evaluation else None,
                 "reasoning": item.explanation_details,
                 "reviewer_notes": item.reviewer_notes,
-                "audit_log": item.audit_log
+                "audit_log": item.audit_log,
             }
 
 

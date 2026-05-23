@@ -13,14 +13,13 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 
-from .config import get_config, get_prompt_config, ExplanationEngineConfig
 from ..intent_engine.models import IntentManifest
 from ..lobster_proxy.engine import DetectedAction, PolicyEvaluation
+from .config import ExplanationEngineConfig, get_config, get_prompt_config
 
 
 @dataclass
@@ -31,6 +30,7 @@ class MismatchExplanation:
     Contains all the information needed for security analysts
     to make informed decisions about quarantined actions.
     """
+
     summary: str = field(default="")
     detailed_reason: str = field(default="")
     risk_description: str = field(default="")
@@ -65,10 +65,7 @@ class GeminiProClient:
             self._client = None
 
     async def generate_content(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1024
+        self, prompt: str, temperature: float = 0.3, max_tokens: int = 1024
     ) -> str:
         """
         Call Gemini Pro API to generate explanation.
@@ -87,13 +84,8 @@ class GeminiProClient:
         headers = {"x-goog-api-key": self.gemini_config.api_key}
 
         payload = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }],
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": max_tokens
-            }
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
         }
 
         for attempt in range(self.gemini_config.max_retries):
@@ -112,14 +104,17 @@ class GeminiProClient:
 
                 raise RuntimeError("Unexpected Gemini Pro response format")
 
-            except httpx.HTTPError as e:
+            except httpx.HTTPError:
                 if attempt < self.gemini_config.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                     continue
-                raise RuntimeError(f"Gemini Pro API call failed after {self.gemini_config.max_retries} attempts")
+                raise RuntimeError(
+                    f"Gemini Pro API call failed after {self.gemini_config.max_retries} attempts"
+                )
 
 
 logger = logging.getLogger("argus.explanation_engine")
+
 
 class ExplanationEngine:
     """
@@ -142,7 +137,7 @@ class ExplanationEngine:
         self,
         manifest: IntentManifest,
         detected_action: DetectedAction,
-        evaluation: PolicyEvaluation
+        evaluation: PolicyEvaluation,
     ) -> MismatchExplanation:
         """
         Generate explanation for an intent-action mismatch.
@@ -161,12 +156,12 @@ class ExplanationEngine:
         if not evaluation.mismatches:
             return MismatchExplanation(
                 summary="Action aligns with declared intent",
-                detailed_reason="No discrepancies found between declared intent and detected action.",
+                detailed_reason="No discrepancies found between declared intent and detected action.",  # noqa: E501
                 risk_description="Low risk - action within authorized boundaries.",
                 user_authorization_summary=self._summarize_authorization(manifest),
                 recommended_action="APPROVE",
                 confidence=1.0,
-                generation_time_ms=0.0
+                generation_time_ms=0.0,
             )
 
         try:
@@ -176,14 +171,12 @@ class ExplanationEngine:
             raw_output = await self.gemini.generate_content(
                 prompt=prompt,
                 temperature=self.prompt_config.temperature,
-                max_tokens=self.prompt_config.max_output_tokens
+                max_tokens=self.prompt_config.max_output_tokens,
             )
 
             # Parse structured response
             explanation = self._parse_explanation_response(
-                raw_output=raw_output,
-                manifest=manifest,
-                evaluation=evaluation
+                raw_output=raw_output, manifest=manifest, evaluation=evaluation
             )
 
             explanation.raw_model_output = raw_output
@@ -194,7 +187,7 @@ class ExplanationEngine:
                 manifest=manifest,
                 detected_action=detected_action,
                 evaluation=evaluation,
-                error=str(e)
+                error=str(e),
             )
 
         explanation.generation_time_ms = (time.time() - start_time) * 1000
@@ -205,7 +198,7 @@ class ExplanationEngine:
         self,
         manifest: IntentManifest,
         detected_action: DetectedAction,
-        evaluation: PolicyEvaluation
+        evaluation: PolicyEvaluation,
     ) -> str:
         """Build prompt for mismatch explanation generation."""
         mismatches_text = "\n".join([f"- {m}" for m in evaluation.mismatches])
@@ -226,14 +219,11 @@ class ExplanationEngine:
             injection_patterns=injection_patterns,
             exfiltration_signals=exfil_signals,
             mismatches=mismatches_text,
-            risk_score=f"{evaluation.risk_score:.2f}"
+            risk_score=f"{evaluation.risk_score:.2f}",
         )
 
     def _parse_explanation_response(
-        self,
-        raw_output: str,
-        manifest: IntentManifest,
-        evaluation: PolicyEvaluation
+        self, raw_output: str, manifest: IntentManifest, evaluation: PolicyEvaluation
     ) -> MismatchExplanation:
         """
         Parse structured explanation from Gemini Pro response.
@@ -245,7 +235,7 @@ class ExplanationEngine:
             start_idx = raw_output.find("{")
             end_idx = raw_output.rfind("}")
             if start_idx != -1 and end_idx != -1:
-                json_str = raw_output[start_idx:end_idx + 1]
+                json_str = raw_output[start_idx : end_idx + 1]
                 data = json.loads(json_str)
                 return MismatchExplanation(
                     summary=data.get("summary", "Mismatch detected"),
@@ -254,7 +244,7 @@ class ExplanationEngine:
                     user_authorization_summary=data.get("user_authorization", ""),
                     recommended_action=data.get("recommended_action", "DENY"),
                     remediation_suggestions=data.get("remediation", []),
-                    confidence=data.get("confidence", 0.8)
+                    confidence=data.get("confidence", 0.8),
                 )
         except json.JSONDecodeError:
             pass
@@ -263,34 +253,25 @@ class ExplanationEngine:
         return self._parse_text_response(raw_output, manifest, evaluation)
 
     def _parse_text_response(
-        self,
-        raw_output: str,
-        manifest: IntentManifest,
-        evaluation: PolicyEvaluation
+        self, raw_output: str, manifest: IntentManifest, evaluation: PolicyEvaluation
     ) -> MismatchExplanation:
         """Parse explanation from unstructured text response."""
-        lines = raw_output.split("\n")
+        lines = [line.strip() for line in raw_output.split("\n") if line.strip()]
 
-        # Simple parsing heuristics
+        # Strip common AI chat prefixes
+        if lines and ("of course" in lines[0].lower() or "here is" in lines[0].lower() or "sure" in lines[0].lower()):
+            lines = lines[1:]
+
         summary = lines[0] if lines else "Mismatch detected"
-        reasoning_parts = []
-        recommendations = []
-
-        for line in lines:
-            line_lower = line.lower()
-            if "mismatch" in line_lower or "detected" in line_lower:
-                reasoning_parts.append(line)
-            if "recommend" in line_lower or "action" in line_lower:
-                recommendations.append(line)
 
         return MismatchExplanation(
-            summary=summary,
-            detailed_reason=" ".join(reasoning_parts[:3]) if reasoning_parts else raw_output[:500],
+            summary=summary[:150],
+            detailed_reason="\n".join(lines) or raw_output,
             risk_description=f"Risk score: {evaluation.risk_score:.2f} ({evaluation.risk_level.value})",
             user_authorization_summary=self._summarize_authorization(manifest),
-            recommended_action=self._extract_recommendation(recommendations),
+            recommended_action="ESCALATE",
             remediation_suggestions=["Review action details", "Contact user for clarification"],
-            confidence=0.6
+            confidence=0.6,
         )
 
     def _generate_fallback_explanation(
@@ -298,22 +279,22 @@ class ExplanationEngine:
         manifest: IntentManifest,
         detected_action: DetectedAction,
         evaluation: PolicyEvaluation,
-        error: str
+        error: str,
     ) -> MismatchExplanation:
         """Generate fallback explanation when Gemini Pro fails."""
         logger.warning("Falling back to template explanation. Gemini error: %s", error)
         return MismatchExplanation(
             summary=f"Intent mismatch: {detected_action.action_type.value} not authorized",
-            detailed_reason=f"The detected action '{detected_action.action_type.value}' targeting '{detected_action.target}' does not match the declared intent '{manifest.declared_intent.value}'. This may indicate a prompt injection attack or unauthorized action attempt.",
-            risk_description=f"Risk score {evaluation.risk_score:.2f} exceeds acceptable threshold ({manifest.risk_ceiling}). Action requires human review.",
+            detailed_reason=f"The detected action '{detected_action.action_type.value}' targeting '{detected_action.target}' does not match the declared intent '{manifest.declared_intent.value}'. This may indicate a prompt injection attack or unauthorized action attempt.",  # noqa: E501
+            risk_description=f"Risk score {evaluation.risk_score:.2f} exceeds acceptable threshold ({manifest.risk_ceiling}). Action requires human review.",  # noqa: E501
             user_authorization_summary=self._summarize_authorization(manifest),
             recommended_action="DENY",
             remediation_suggestions=[
                 "Verify user's original intent",
                 "Check for prompt injection in recent inputs",
-                "Report to security team if attack suspected"
+                "Report to security team if attack suspected",
             ],
-            confidence=0.5
+            confidence=0.5,
         )
 
     def _summarize_authorization(self, manifest: IntentManifest) -> str:
@@ -321,7 +302,7 @@ class ExplanationEngine:
         allowed = ", ".join([a.value for a in manifest.allowed_actions[:3]])
         if len(manifest.allowed_actions) > 3:
             allowed += "..."
-        return f"Intent: {manifest.declared_intent.value}, Allowed: [{allowed}], Scope: {manifest.scope or 'unrestricted'}"
+        return f"Intent: {manifest.declared_intent.value}, Allowed: [{allowed}], Scope: {manifest.scope or 'unrestricted'}"  # noqa: E501
 
     def _extract_recommendation(self, recommendation_lines: list[str]) -> str:
         """Extract recommended action from text."""
@@ -336,12 +317,7 @@ class ExplanationEngine:
         return "ESCALATE"
 
     async def explain_simple(
-        self,
-        action_type: str,
-        target: str,
-        intent: str,
-        risk_score: float,
-        reason: str
+        self, action_type: str, target: str, intent: str, risk_score: float, reason: str
     ) -> str:
         """
         Generate simple one-line explanation for quick dashboard display.
@@ -353,14 +329,12 @@ class ExplanationEngine:
             target=target,
             intent=intent,
             risk_score=risk_score,
-            reason=reason
+            reason=reason,
         )
 
         try:
             return await self.gemini.generate_content(
-                prompt=prompt,
-                temperature=0.2,
-                max_tokens=256
+                prompt=prompt, temperature=0.2, max_tokens=256
             )
         except Exception:
             logger.warning("Fallback to template explanation for '%s' on '%s'", action_type, target)
@@ -384,7 +358,7 @@ class SyncExplanationEngine:
         self,
         manifest: IntentManifest,
         detected_action: DetectedAction,
-        evaluation: PolicyEvaluation
+        evaluation: PolicyEvaluation,
     ) -> MismatchExplanation:
         """Synchronously explain mismatch."""
         loop = self._get_loop()

@@ -5,7 +5,9 @@
 <br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green.svg)](https://www.python.org/)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-green.svg)](https://www.python.org/)
+[![Tests](https://img.shields.io/badge/Tests-136%20passing-22c55e?style=for-the-badge)](tests/)
+[![Ruff](https://img.shields.io/badge/Ruff-0%20errors-22c55e?style=for-the-badge)](https://docs.astral.sh/ruff/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-orange.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Gemini](https://img.shields.io/badge/Gemini-Flash%20%7C%20Pro-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
@@ -41,21 +43,27 @@ An attacker embeds hidden instructions in an email — every input security tool
 ## Quick Start
 
 ```bash
+# Prerequisites: Python 3.11+, Node.js 18+, pnpm
+
 # Clone & Install
 git clone https://github.com/tanishra/argus.git
 cd argus
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
 
-# Configure
+# Backend (using uv — fast Python package manager)
+uv sync --dev
 cp .env.example .env
-# Add your GEMINI_API_KEY (get from https://aistudio.google.com/)
+# Add your GEMINI_API_KEY to .env (get from https://aistudio.google.com/)
+uv run uvicorn src.main:app --reload --port 8000
 
-# Run Backend
-uvicorn src.main:app --reload --port 8000
+# Frontend (separate terminal)
+cd argus-dashboard
+pnpm install && pnpm dev
 
-# Run Dashboard (separate terminal)
-cd argus-dashboard && pnpm install && pnpm dev
+# Run tests (136+ passing)
+uv run pytest tests/ -v
+
+# Lint (0 ruff errors)
+ruff check src/
 ```
 
 ## Architecture
@@ -170,7 +178,13 @@ argus/
 ├── infrastructure/        # Deployment scripts (EC2, Cloud-init)
 ├── lobstertrap/           # Veea Lobster Trap binary (Submodule)
 ├── scripts/               # Setup & automation scripts
-└── tests/                 # Unit tests
+└── tests/                 # Unit & integration tests
+    ├── human_gate/        # Review queue tests
+    ├── intent_engine/     # Intent extraction tests
+    ├── lobster_proxy/     # Policy engine tests
+    ├── explanation_engine/# Explanation tests
+    ├── demo/              # Demo scenario tests
+    └── ...                # Module-level tests (event_bus, audit, database, session_store, playground)
 ```
 
 ## License

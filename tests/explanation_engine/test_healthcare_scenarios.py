@@ -9,19 +9,20 @@ Run with: python -m pytest tests/explanation_engine/ -v
 Or standalone: python -m tests.explanation_engine.test_healthcare_scenarios
 """
 
-import asyncio
 import sys
-from datetime import datetime, timezone
 
 # Add project root to path for standalone execution
 sys.path.insert(0, ".")
 
-from src.intent_engine.models import IntentManifest, IntentCategory, ActionType
+from src.explanation_engine.engine import SyncExplanationEngine
+from src.intent_engine.models import ActionType, IntentCategory, IntentManifest
 from src.lobster_proxy.engine import (
-    LobsterTrapProxy, LobsterTrapEngine, DetectedAction,
-    PolicyEvaluation, Decision, RiskThreshold
+    Decision,
+    DetectedAction,
+    LobsterTrapProxy,
+    PolicyEvaluation,
+    RiskThreshold,
 )
-from src.explanation_engine.engine import ExplanationEngine, SyncExplanationEngine
 
 
 def create_clinical_manifest() -> IntentManifest:
@@ -89,7 +90,6 @@ def test_scenario_1_phi_exfiltration():
     assert len(evaluation.mismatches) > 0, "Expected at least one mismatch"
 
     print("  ✅ PASSED — Attack correctly quarantined")
-    return manifest, action, evaluation
 
 
 # ============================================================
@@ -130,7 +130,6 @@ def test_scenario_2_bulk_delete():
         "Expected 'forbidden' in mismatches"
 
     print("  ✅ PASSED — Bulk delete correctly blocked")
-    return manifest, action, evaluation
 
 
 # ============================================================
@@ -169,7 +168,6 @@ def test_scenario_3_privilege_escalation():
         f"Expected QUARANTINE or DENY, got {evaluation.decision.value}"
 
     print("  ✅ PASSED — Privilege escalation correctly blocked")
-    return manifest, action, evaluation
 
 
 # ============================================================
@@ -206,10 +204,9 @@ def test_scenario_4_out_of_scope():
 
     # READ_PATIENT_RECORD is allowed, but target is outside scope
     # The engine should detect scope mismatch
-    print(f"  Note: read_patient_record is allowed, but target scope is ICU not Ward 3B")
+    print("  Note: read_patient_record is allowed, but target scope is ICU not Ward 3B")
 
     print("  ✅ PASSED — Evaluation completed")
-    return manifest, action, evaluation
 
 
 # ============================================================
@@ -250,7 +247,6 @@ def test_scenario_5_financial_action():
         f"Expected QUARANTINE or DENY, got {evaluation.decision.value}"
 
     print("  ✅ PASSED — Financial action from clinical agent blocked")
-    return manifest, action, evaluation
 
 
 # ============================================================
@@ -356,12 +352,16 @@ def run_all_tests():
 
     results = []
 
-    # Run all 5 scenarios
-    results.append(("Scenario 1: PHI Exfiltration", test_scenario_1_phi_exfiltration()))
-    results.append(("Scenario 2: Bulk Delete", test_scenario_2_bulk_delete()))
-    results.append(("Scenario 3: Privilege Escalation", test_scenario_3_privilege_escalation()))
-    results.append(("Scenario 4: Out-of-Scope Access", test_scenario_4_out_of_scope()))
-    results.append(("Scenario 5: Financial Action", test_scenario_5_financial_action()))
+    # Run all 5 scenarios (which now return None and run assertions internally)
+    for name, fn in [
+        ("Scenario 1: PHI Exfiltration", test_scenario_1_phi_exfiltration),
+        ("Scenario 2: Bulk Delete", test_scenario_2_bulk_delete),
+        ("Scenario 3: Privilege Escalation", test_scenario_3_privilege_escalation),
+        ("Scenario 4: Out-of-Scope Access", test_scenario_4_out_of_scope),
+        ("Scenario 5: Financial Action", test_scenario_5_financial_action),
+    ]:
+        fn()
+        results.append((name, "PASSED"))
 
     # Bonus tests
     test_normal_operations()
@@ -371,10 +371,8 @@ def run_all_tests():
     print("\n" + "="*60)
     print("TEST SUMMARY")
     print("="*60)
-    for name, (manifest, action, evaluation) in results:
-        decision = evaluation.decision.value.upper()
-        risk = f"{evaluation.risk_score:.2f}"
-        print(f"  {name}: {decision} (risk: {risk})")
+    for name, status in results:
+        print(f"  {name}: {status}")
 
     print("\n✅ All healthcare mismatch scenarios tested")
     print("="*60)

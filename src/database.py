@@ -8,17 +8,14 @@ Supports both SQLite (aiosqlite) and PostgreSQL (asyncpg).
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import (
-    Column, String, Integer, DateTime, Text, Index, JSON as SA_JSON,
-    select, delete
-)
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import JSON as SA_JSON
+from sqlalchemy import Column, DateTime, Index, Integer, String, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger("argus.database")
@@ -44,9 +41,7 @@ class ReviewRecord(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
-    __table_args__ = (
-        Index("ix_review_status_created", "status", "created_at"),
-    )
+    __table_args__ = (Index("ix_review_status_created", "status", "created_at"),)
 
 
 class AuditLogEntry(Base):
@@ -59,9 +54,7 @@ class AuditLogEntry(Base):
     user_id = Column(String(64), nullable=True)
     details = Column(SA_JSON, nullable=True)
 
-    __table_args__ = (
-        Index("ix_audit_session_event", "session_id", "event_type"),
-    )
+    __table_args__ = (Index("ix_audit_session_event", "session_id", "event_type"),)
 
 
 async def init_db():
@@ -108,6 +101,7 @@ async def close_db():
 
 
 # ============ Review Queue CRUD ============
+
 
 async def save_review_record(item_id: str, data: dict, status: str, created_at: datetime):
     session = await get_session()
@@ -165,7 +159,11 @@ async def load_active_review_records() -> list[dict]:
         async with session:
             result = await session.execute(
                 select(ReviewRecord)
-                .where(ReviewRecord.status.notin_(["approved", "denied", "escalated", "expired", "cancelled"]))
+                .where(
+                    ReviewRecord.status.notin_(
+                        ["approved", "denied", "escalated", "expired", "cancelled"]
+                    )
+                )
                 .order_by(ReviewRecord.created_at)
             )
             return [row.data for row in result.scalars().all()]
@@ -176,9 +174,13 @@ async def load_active_review_records() -> list[dict]:
 
 # ============ Audit CRUD ============
 
+
 async def save_audit_entry_db(
-    timestamp: datetime, event_type: str, session_id: str,
-    details: dict, user_id: Optional[str] = None
+    timestamp: datetime,
+    event_type: str,
+    session_id: str,
+    details: dict,
+    user_id: Optional[str] = None,
 ):
     session = await get_session()
     if not session:
@@ -205,9 +207,7 @@ async def load_recent_audit_entries_db(limit: int = 100) -> list[dict]:
     try:
         async with session:
             result = await session.execute(
-                select(AuditLogEntry)
-                .order_by(AuditLogEntry.timestamp.desc())
-                .limit(limit)
+                select(AuditLogEntry).order_by(AuditLogEntry.timestamp.desc()).limit(limit)
             )
             return [
                 {

@@ -23,24 +23,26 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
-from ..intent_engine.models import IntentManifest, ActionType
+from ..intent_engine.models import ActionType, IntentManifest
 
 
 class Decision(str, Enum):
     """Policy enforcement decision outcomes."""
-    ALLOW = "allow"                    # Action approved
-    LOG_AND_ALLOW = "log_and_allow"    # Action approved but logged for review
-    HUMAN_REVIEW = "human_review"      # Quarantined for human review
-    DENY = "deny"                      # Explicitly blocked
-    QUARANTINE = "quarantine"           # Intent mismatch - needs review
-    ERROR = "error"                     # Policy evaluation failed
+
+    ALLOW = "allow"  # Action approved
+    LOG_AND_ALLOW = "log_and_allow"  # Action approved but logged for review
+    HUMAN_REVIEW = "human_review"  # Quarantined for human review
+    DENY = "deny"  # Explicitly blocked
+    QUARANTINE = "quarantine"  # Intent mismatch - needs review
+    ERROR = "error"  # Policy evaluation failed
 
 
 class RiskThreshold(str, Enum):
     """Risk scoring thresholds."""
-    LOW = "low"        # 0.0 - 0.3
+
+    LOW = "low"  # 0.0 - 0.3
     MEDIUM = "medium"  # 0.3 - 0.7
-    HIGH = "high"      # 0.7 - 0.9
+    HIGH = "high"  # 0.7 - 0.9
     CRITICAL = "critical"  # 0.9 - 1.0
 
 
@@ -52,6 +54,7 @@ class DetectedAction:
     This is the 'detected' side of the bidirectional comparison
     that Lobster Trap performs with the 'declared' manifest.
     """
+
     action_type: ActionType
     target: str
     target_type: str = "unknown"  # email, file, api, domain, etc.
@@ -70,7 +73,7 @@ class DetectedAction:
             "timestamp": self.timestamp.isoformat(),
             "risk_indicators": self.risk_indicators,
             "injection_patterns": self.injection_patterns,
-            "exfiltration_signals": self.exfiltration_signals
+            "exfiltration_signals": self.exfiltration_signals,
         }
 
 
@@ -81,6 +84,7 @@ class PolicyEvaluation:
 
     Contains both the decision and detailed reasoning for audit trails.
     """
+
     decision: Decision
     risk_score: float
     risk_level: RiskThreshold
@@ -99,7 +103,7 @@ class PolicyEvaluation:
             "mismatches": self.mismatches,
             "evidence": self.evidence,
             "policy_version": self.policy_version,
-            "evaluation_time_ms": self.evaluation_time_ms
+            "evaluation_time_ms": self.evaluation_time_ms,
         }
 
     def is_allowed(self) -> bool:
@@ -128,7 +132,7 @@ class LobsterTrapEngine:
             RiskThreshold.LOW: (0.0, 0.3),
             RiskThreshold.MEDIUM: (0.3, 0.7),
             RiskThreshold.HIGH: (0.7, 0.9),
-            RiskThreshold.CRITICAL: (0.9, 1.0)
+            RiskThreshold.CRITICAL: (0.9, 1.0),
         }
 
         # Default decision mapping
@@ -136,7 +140,7 @@ class LobsterTrapEngine:
             RiskThreshold.LOW: Decision.ALLOW,
             RiskThreshold.MEDIUM: Decision.LOG_AND_ALLOW,
             RiskThreshold.HIGH: Decision.HUMAN_REVIEW,
-            RiskThreshold.CRITICAL: Decision.DENY
+            RiskThreshold.CRITICAL: Decision.DENY,
         }
 
         # Known attack patterns for detection
@@ -180,9 +184,7 @@ class LobsterTrapEngine:
         ]
 
     def evaluate_action(
-        self,
-        manifest: IntentManifest,
-        detected_action: DetectedAction
+        self, manifest: IntentManifest, detected_action: DetectedAction
     ) -> PolicyEvaluation:
         """
         Evaluate an action against the declared intent manifest.
@@ -202,29 +204,20 @@ class LobsterTrapEngine:
 
         # Step 1: Check if action is allowed by manifest
         if not manifest.is_action_allowed(detected_action.action_type):
-            mismatches.append(
-                f"Action '{detected_action.action_type.value}' not in allowed list"
-            )
+            mismatches.append(f"Action '{detected_action.action_type.value}' not in allowed list")
 
         # Step 2: Check for forbidden actions
         if detected_action.action_type in manifest.forbidden_actions:
-            mismatches.append(
-                f"Action '{detected_action.action_type.value}' explicitly forbidden"
-            )
+            mismatches.append(f"Action '{detected_action.action_type.value}' explicitly forbidden")
 
         # Step 3: Check scope boundaries
-        scope_violation = self._check_scope(
-            detected_action.target,
-            manifest.scope
-        )
+        scope_violation = self._check_scope(detected_action.target, manifest.scope)
         if scope_violation:
             mismatches.append(scope_violation)
 
         # Step 4: Calculate risk score
         risk_score = self._calculate_risk_score(
-            manifest=manifest,
-            action=detected_action,
-            mismatches=mismatches
+            manifest=manifest, action=detected_action, mismatches=mismatches
         )
 
         risk_level = self._get_risk_level(risk_score)
@@ -245,9 +238,7 @@ class LobsterTrapEngine:
 
         # Step 7: Determine decision
         decision = self._determine_decision(
-            risk_score=risk_score,
-            risk_level=risk_level,
-            mismatches=mismatches
+            risk_score=risk_score, risk_level=risk_level, mismatches=mismatches
         )
 
         # Generate reason
@@ -262,7 +253,7 @@ class LobsterTrapEngine:
             reason=reason,
             mismatches=mismatches,
             evidence=evidence,
-            evaluation_time_ms=evaluation_time
+            evaluation_time_ms=evaluation_time,
         )
 
     def _check_scope(self, target: str, scope: str) -> Optional[str]:
@@ -278,7 +269,7 @@ class LobsterTrapEngine:
         # Scope examples: "customer_complaints@inbox", "src/", "analytics_db"
 
         if "@" in scope:  # Email scope
-            if target and re.match(r'^[^@]+@[^@]+\.[^@]+$', target):
+            if target and re.match(r"^[^@]+@[^@]+\.[^@]+$", target):
                 target_domain = target.split("@")[-1]
                 scope_domain = scope.split("@")[-1]
                 if target_domain and scope_domain and target_domain != scope_domain:
@@ -295,10 +286,7 @@ class LobsterTrapEngine:
         return None
 
     def _calculate_risk_score(
-        self,
-        manifest: IntentManifest,
-        action: DetectedAction,
-        mismatches: list[str]
+        self, manifest: IntentManifest, action: DetectedAction, mismatches: list[str]
     ) -> float:
         """
         Calculate risk score based on multiple factors.
@@ -333,21 +321,18 @@ class LobsterTrapEngine:
             ActionType.DELETE_FILE: 0.7,
             ActionType.REVOKE_PERMISSION: 0.8,
             ActionType.GRANT_PERMISSION: 0.75,
-
             # Medium risk actions
             ActionType.SEND_EMAIL: 0.5,
             ActionType.WRITE_FILE: 0.5,
             ActionType.EXECUTE_CODE: 0.6,
             ActionType.QUERY_DATABASE: 0.4,
             ActionType.UPDATE_RECORD: 0.4,
-
             # Lower risk actions
             ActionType.READ_EMAIL: 0.2,
             ActionType.READ_FILE: 0.1,
             ActionType.WRITE_REPLY: 0.15,
             ActionType.CREATE_TICKET: 0.2,
             ActionType.CREATE_FILE: 0.25,
-
             # Healthcare-specific actions
             ActionType.EXPORT_PHI: 0.95,
             ActionType.FORWARD_PHI_EXTERNAL: 0.95,
@@ -357,9 +342,8 @@ class LobsterTrapEngine:
             ActionType.READ_PATIENT_RECORD: 0.25,
             ActionType.GENERATE_DISCHARGE_SUMMARY: 0.2,
             ActionType.UPDATE_EHR: 0.35,
-
             # Default
-            ActionType.UNKNOWN: 0.5
+            ActionType.UNKNOWN: 0.5,
         }
         return risk_map.get(action_type, 0.3)
 
@@ -406,10 +390,11 @@ class LobsterTrapEngine:
 
         target_lower = action.target.lower()
         import re
-        if re.search(r'\bexternal\b', target_lower):
+
+        if re.search(r"\bexternal\b", target_lower):
             detected_signals.append("external_domain:external")
             score += 0.3
-        if re.search(r'\bbackup\b', target_lower):
+        if re.search(r"\bbackup\b", target_lower):
             detected_signals.append("external_domain:backup")
             score += 0.3
 
@@ -436,10 +421,7 @@ class LobsterTrapEngine:
         return RiskThreshold.CRITICAL
 
     def _determine_decision(
-        self,
-        risk_score: float,
-        risk_level: RiskThreshold,
-        mismatches: list[str]
+        self, risk_score: float, risk_level: RiskThreshold, mismatches: list[str]
     ) -> Decision:
         """
         Determine policy decision based on risk and mismatches.
@@ -450,26 +432,24 @@ class LobsterTrapEngine:
         # Any mismatch between declared and detected = QUARANTINE
         if len(mismatches) > 0:
             # Could be intent mismatch or scope violation
-            if any("not in allowed" in m or "forbidden" in m or "outside scope" in m for m in mismatches):
+            if any(
+                "not in allowed" in m or "forbidden" in m or "outside scope" in m
+                for m in mismatches
+            ):
                 return Decision.QUARANTINE
 
         # Otherwise, use risk-based decision
         return self.decision_mapping.get(risk_level, Decision.LOG_AND_ALLOW)
 
-    def _generate_reason(
-        self,
-        decision: Decision,
-        risk_score: float,
-        mismatches: list[str]
-    ) -> str:
+    def _generate_reason(self, decision: Decision, risk_score: float, mismatches: list[str]) -> str:
         """Generate human-readable reason for decision."""
         reasons = {
             Decision.ALLOW: f"Action within acceptable risk (score: {risk_score:.2f})",
-            Decision.LOG_AND_ALLOW: f"Action allowed but flagged for logging (score: {risk_score:.2f})",
+            Decision.LOG_AND_ALLOW: f"Action allowed but flagged for logging (score: {risk_score:.2f})",  # noqa: E501
             Decision.HUMAN_REVIEW: f"Action requires human review (score: {risk_score:.2f})",
             Decision.DENY: f"Action blocked due to high risk (score: {risk_score:.2f})",
             Decision.QUARANTINE: f"Intent mismatch detected: {'; '.join(mismatches)}",
-            Decision.ERROR: "Policy evaluation encountered an error"
+            Decision.ERROR: "Policy evaluation encountered an error",
         }
 
         base_reason = reasons.get(decision, "Unknown decision")
@@ -480,9 +460,7 @@ class LobsterTrapEngine:
         return base_reason
 
     def evaluate_batch(
-        self,
-        manifest: IntentManifest,
-        actions: list[DetectedAction]
+        self, manifest: IntentManifest, actions: list[DetectedAction]
     ) -> list[PolicyEvaluation]:
         """Evaluate multiple actions in batch."""
         results = []
@@ -499,7 +477,7 @@ class LobsterTrapProxy:
     When USE_LOBSTER_TRAP_BINARY=true and the binary is available,
     results from the real Lobster Trap DPI engine are merged with
     ARGUS's action-level intent comparison for a holistic decision.
-    
+
     Binary path resolved from LOBSTER_TRAP_BINARY_PATH env var,
     defaulting to ./lobster-trap/lobstertrap then ./lobstertrap/lobstertrap.
     """
@@ -510,7 +488,9 @@ class LobsterTrapProxy:
         self.use_real_binary = os.getenv("USE_LOBSTER_TRAP_BINARY", "false").lower() == "true"
         self._policy_path = os.getenv(
             "LOBSTER_TRAP_POLICY_PATH",
-            os.path.join(os.path.dirname(__file__), "..", "..", "configs", "lobstertrap_policy.yaml")
+            os.path.join(
+                os.path.dirname(__file__), "..", "..", "configs", "lobstertrap_policy.yaml"
+            ),
         )
         self.binary_path = self._find_binary()
 
@@ -541,22 +521,22 @@ class LobsterTrapProxy:
             "policy_message": None,
         }
 
-        json_match = re.search(r'\{[\s\S]*?\}', raw)
+        json_match = re.search(r"\{[\s\S]*?\}", raw)
         if json_match:
             try:
                 result["metadata"] = json.loads(json_match.group())
             except json.JSONDecodeError:
                 pass
 
-        action_m = re.search(r'Action:\s+(\w+)', raw)
+        action_m = re.search(r"Action:\s+(\w+)", raw)
         if action_m:
             result["policy_action"] = action_m.group(1)
 
-        rule_m = re.search(r'Rule:\s+(\S+)', raw)
+        rule_m = re.search(r"Rule:\s+(\S+)", raw)
         if rule_m:
             result["policy_rule"] = rule_m.group(1)
 
-        msg_m = re.search(r'Message:\s+(.+)', raw)
+        msg_m = re.search(r"Message:\s+(.+)", raw)
         if msg_m:
             result["policy_message"] = msg_m.group(1).strip()
 
@@ -575,12 +555,18 @@ class LobsterTrapProxy:
         try:
             result = subprocess.run(
                 cmd + [prompt_text],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 return self._parse_binary_output(result.stdout)
             else:
-                logger.warning("Lobster Trap binary returned code %d: %s", result.returncode, result.stderr[:200])
+                logger.warning(
+                    "Lobster Trap binary returned code %d: %s",
+                    result.returncode,
+                    result.stderr[:200],
+                )
         except FileNotFoundError:
             logger.warning("Lobster Trap binary not found at %s", self.binary_path)
         except subprocess.TimeoutExpired:
@@ -601,11 +587,7 @@ class LobsterTrapProxy:
             return os.path.abspath(default_policy)
         return None
 
-    def process_action(
-        self,
-        manifest: IntentManifest,
-        action: DetectedAction
-    ) -> PolicyEvaluation:
+    def process_action(self, manifest: IntentManifest, action: DetectedAction) -> PolicyEvaluation:
         """
         Process a single action through the policy engine.
 
@@ -674,10 +656,16 @@ class LobsterTrapProxy:
             decision = Decision.DENY
             if "Prompt injection patterns detected" not in str(mismatches):
                 mismatches.append("Lobster Trap DPI escalated action to DENY")
-        elif binary_action == "HUMAN_REVIEW" and decision in (Decision.ALLOW, Decision.LOG_AND_ALLOW):
+        elif binary_action == "HUMAN_REVIEW" and decision in (
+            Decision.ALLOW,
+            Decision.LOG_AND_ALLOW,
+        ):
             decision = Decision.HUMAN_REVIEW
 
-        policy_message = binary_result.get("policy_message") or "Evaluated by Lobster Trap DPI + ARGUS intent engine"
+        policy_message = (
+            binary_result.get("policy_message")
+            or "Evaluated by Lobster Trap DPI + ARGUS intent engine"
+        )
         eval_time_ms = (time.time() - start) * 1000
 
         return PolicyEvaluation(
@@ -696,14 +684,14 @@ class LobsterTrapProxy:
         action_type: ActionType,
         target: str,
         target_type: str = "unknown",
-        parameters: Optional[dict] = None
+        parameters: Optional[dict] = None,
     ) -> DetectedAction:
         """Factory method to create detected action."""
         return DetectedAction(
             action_type=action_type,
             target=target,
             target_type=target_type,
-            parameters=parameters or {}
+            parameters=parameters or {},
         )
 
     def get_decision_color(self, decision: Decision) -> str:
@@ -714,7 +702,7 @@ class LobsterTrapProxy:
             Decision.HUMAN_REVIEW: "orange",
             Decision.DENY: "red",
             Decision.QUARANTINE: "red",
-            Decision.ERROR: "gray"
+            Decision.ERROR: "gray",
         }
         return colors.get(decision, "gray")
 

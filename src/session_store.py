@@ -2,8 +2,10 @@ import asyncio
 import json
 import logging
 import os
-import redis.asyncio as redis
 from typing import Optional
+
+import redis.asyncio as redis
+
 from .intent_engine.models import IntentManifest
 
 logger = logging.getLogger("argus.session_store")
@@ -12,6 +14,7 @@ _redis_client: Optional[redis.Redis] = None
 _memory_fallback: dict[str, str] = {}
 _redis_lock = asyncio.Lock()
 _memory_lock = asyncio.Lock()
+
 
 async def get_redis(max_retries: int = 3) -> redis.Redis:
     global _redis_client
@@ -29,11 +32,14 @@ async def get_redis(max_retries: int = 3) -> redis.Redis:
                 _redis_client = client
                 return _redis_client
             except Exception as e:
-                logger.warning("Redis connection attempt %d/%d failed: %s", attempt + 1, max_retries, e)
+                logger.warning(
+                    "Redis connection attempt %d/%d failed: %s", attempt + 1, max_retries, e
+                )
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
         logger.warning("All Redis connection attempts failed; using in-memory fallback")
         return None
+
 
 async def save_manifest(session_id: str, manifest: IntentManifest, ttl_seconds: int = 3600):
     """Save manifest to Redis with TTL. Falls back to in-memory dict."""
@@ -47,6 +53,7 @@ async def save_manifest(session_id: str, manifest: IntentManifest, ttl_seconds: 
             logger.exception("Redis save failed, falling back to memory")
     async with _memory_lock:
         _memory_fallback[session_id] = payload
+
 
 async def get_manifest(session_id: str) -> Optional[IntentManifest]:
     """Retrieve manifest from Redis. Falls back to in-memory."""
@@ -63,6 +70,7 @@ async def get_manifest(session_id: str) -> Optional[IntentManifest]:
     if data:
         return IntentManifest.from_dict(json.loads(data))
     return None
+
 
 async def delete_manifest(session_id: str):
     """Delete manifest from Redis and fallback."""

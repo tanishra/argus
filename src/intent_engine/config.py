@@ -16,16 +16,18 @@ from pydantic import BaseModel, Field
 
 class GeminiConfig(BaseModel):
     """Gemini API configuration."""
+
     api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    model_name: str = Field(default="gemini-2.0-flash")
+    model_name: str = Field(default="gemini-2.5-flash")
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=512)
-    timeout_seconds: int = Field(default=10)
+    max_tokens: int = Field(default=8192)
+    timeout_seconds: int = Field(default=60)
     max_retries: int = Field(default=3)
 
 
 class IntentEngineConfig(BaseModel):
     """Main configuration for Intent Engine."""
+
     gemini: GeminiConfig = Field(default_factory=GeminiConfig)
     latency_target_ms: float = Field(default=300.0)
     confidence_threshold_high: float = Field(default=0.8)
@@ -37,8 +39,9 @@ class IntentEngineConfig(BaseModel):
 @dataclass
 class ExtractionConfig:
     """Runtime configuration for intent extraction."""
+
     temperature: float = 0.1
-    max_output_tokens: int = 1024
+    max_output_tokens: int = 8192
     response_mime_type: str = "application/json"
 
     # Extraction prompts
@@ -75,9 +78,9 @@ Available intent categories:
 IMPORTANT:
 - Be conservative with risk_ceiling (default 0.3 for unfamiliar tasks, 0.25 for healthcare tasks)
 - If action is not explicitly allowed, add it to forbidden_actions
-- For healthcare tasks, ALWAYS add export_phi, forward_phi_external, delete_patient_record to forbidden_actions
+- For healthcare tasks, ALWAYS add export_phi, forward_phi_external, delete_patient_record to forbidden_actions  # noqa: E501
 - Extract scope as specifically as possible
-- Return ONLY valid, complete JSON. DO NOT use markdown code blocks (no ```). DO NOT add any text before or after. Every string must be properly closed with double quotes."""
+- Return ONLY valid, complete JSON. DO NOT use markdown code blocks (no ```). DO NOT add any text before or after. Every string must be properly closed with double quotes."""  # noqa: E501
 
     @property
     def full_system_prompt(self) -> str:
@@ -89,17 +92,17 @@ def load_config() -> IntentEngineConfig:
     return IntentEngineConfig(
         gemini=GeminiConfig(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model_name=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            model_name=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
             temperature=0.1,
-            max_tokens=512,
-            timeout_seconds=10,
-            max_retries=3
+            max_tokens=8192,
+            timeout_seconds=60,
+            max_retries=3,
         ),
         latency_target_ms=float(os.getenv("INTENT_LATENCY_TARGET_MS", "300")),
         confidence_threshold_high=0.8,
         confidence_threshold_low=0.5,
         cache_enabled=os.getenv("INTENT_CACHE_ENABLED", "true").lower() == "true",
-        cache_ttl_seconds=int(os.getenv("INTENT_CACHE_TTL", "300"))
+        cache_ttl_seconds=int(os.getenv("INTENT_CACHE_TTL", "300")),
     )
 
 

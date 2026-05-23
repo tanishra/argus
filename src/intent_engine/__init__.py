@@ -6,17 +6,16 @@ Layer 1 of ARGUS architecture - extracts user intent from natural language
 and generates structured Intent Manifests for authorization decisions.
 """
 
+from .config import IntentEngineConfig, get_config, get_extraction_config
+from .extractor import IntentCache, IntentExtractor, SyncIntentExtractor
 from .models import (
-    IntentManifest,
-    IntentExtractionResult,
-    IntentCategory,
     ActionType,
+    IntentCategory,
+    IntentExtractionResult,
+    IntentManifest,
     RiskLevel,
-    create_conservative_manifest
+    create_conservative_manifest,
 )
-
-from .extractor import IntentExtractor, SyncIntentExtractor, IntentCache
-from .config import get_config, get_extraction_config, IntentEngineConfig
 
 __all__ = [
     # Models

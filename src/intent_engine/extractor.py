@@ -20,13 +20,13 @@ from typing import Optional
 
 import httpx
 
-from .config import get_config, get_extraction_config, IntentEngineConfig
+from .config import IntentEngineConfig, get_config, get_extraction_config
 from .models import (
-    IntentManifest,
-    IntentExtractionResult,
-    IntentCategory,
     ActionType,
-    create_conservative_manifest
+    IntentCategory,
+    IntentExtractionResult,
+    IntentManifest,
+    create_conservative_manifest,
 )
 
 
@@ -58,7 +58,10 @@ class IntentCache:
             self._cache.popitem(last=False)
 
     def _make_key(self, user_input: str) -> str:
-        return hashlib.sha256(user_input.lower().strip().encode()).hexdigest()
+        import re
+
+        normalized = re.sub(r"\s+", " ", user_input.lower().strip())
+        return hashlib.sha256(normalized.encode()).hexdigest()
 
     def clear(self) -> None:
         self._cache.clear()
@@ -87,10 +90,7 @@ class GeminiClient:
             self._client = None
 
     async def generate_content(
-        self,
-        prompt: str,
-        temperature: float = 0.1,
-        max_tokens: int = 512
+        self, prompt: str, temperature: float = 0.1, max_tokens: int = 512
     ) -> str:
         """
         Call Gemini API to generate content.
@@ -112,14 +112,18 @@ class GeminiClient:
         headers = {"x-goog-api-key": self.gemini_config.api_key}
 
         payload = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }],
+            "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": temperature,
                 "maxOutputTokens": max_tokens,
-                "responseMimeType": "application/json"
-            }
+                "responseMimeType": "application/json",
+            },
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ],
         }
 
         for attempt in range(self.gemini_config.max_retries):
@@ -139,11 +143,13 @@ class GeminiClient:
 
                 raise RuntimeError("Unexpected Gemini response format")
 
-            except httpx.HTTPError as e:
+            except httpx.HTTPError:
                 if attempt < self.gemini_config.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    await asyncio.sleep(2**attempt)  # Exponential backoff
                     continue
-                raise RuntimeError(f"Gemini API call failed after {self.gemini_config.max_retries} retries")
+                raise RuntimeError(
+                    f"Gemini API call failed after {self.gemini_config.max_retries} retries"
+                )
 
 
 class IntentExtractor:
@@ -165,10 +171,7 @@ class IntentExtractor:
         await self.gemini.close()
 
     async def extract_intent(
-        self,
-        user_input: str,
-        session_id: str,
-        user_id: Optional[str] = None
+        self, user_input: str, session_id: str, user_id: Optional[str] = None
     ) -> IntentExtractionResult:
         """
         Extract user intent from natural language input.
@@ -196,20 +199,18 @@ class IntentExtractor:
                     extraction_time_ms=0.0,
                     raw_model_output="[cached]",
                     warnings=["Result retrieved from cache"],
-                    fallback_used=False
+                    fallback_used=False,
                 )
 
         # Generate extraction prompt
-        prompt = self.extraction_config.full_system_prompt.format(
-            user_input=user_input
-        )
+        prompt = self.extraction_config.full_system_prompt.format(user_input=user_input)
 
         try:
             # Call Gemini
             raw_output = await self.gemini.generate_content(
                 prompt=prompt,
                 temperature=self.extraction_config.temperature,
-                max_tokens=self.extraction_config.max_output_tokens
+                max_tokens=self.extraction_config.max_output_tokens,
             )
 
             # Parse JSON response
@@ -223,9 +224,7 @@ class IntentExtractor:
 
             # Build manifest
             manifest = self._build_manifest(
-                extracted_data=extracted_data,
-                session_id=session_id,
-                user_id=user_id
+                extracted_data=extracted_data, session_id=session_id, user_id=user_id
             )
 
             # Estimate confidence based on data quality
@@ -243,12 +242,14 @@ class IntentExtractor:
                 extraction_time_ms=extraction_time,
                 raw_model_output=raw_output,
                 warnings=warnings,
-                fallback_used=False
+                fallback_used=False,
             )
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             # Fail-secure: return conservative manifest on any error
-            warnings.append("Extraction failed — using conservative fallback")
+            warnings.append(f"Extraction failed — using conservative fallback: {e}")
 
             manifest = create_conservative_manifest(session_id)
             extraction_time = (time.time() - start_time) * 1000
@@ -259,7 +260,7 @@ class IntentExtractor:
                 extraction_time_ms=extraction_time,
                 raw_model_output=None,
                 warnings=warnings,
-                fallback_used=True
+                fallback_used=True,
             )
 
     def _repair_json(self, text: str) -> Optional[str]:
@@ -275,7 +276,7 @@ class IntentExtractor:
             if escaped:
                 escaped = False
                 continue
-            if ch == '\\':
+            if ch == "\\":
                 escaped = True
                 continue
             if ch == '"' and not escaped:
@@ -283,13 +284,13 @@ class IntentExtractor:
                 continue
             if in_string:
                 continue
-            if ch in '{[':
+            if ch in "{[":
                 stack.append(ch)
-            elif ch == '}':
-                if stack and stack[-1] == '{':
+            elif ch == "}":
+                if stack and stack[-1] == "{":
                     stack.pop()
-            elif ch == ']':
-                if stack and stack[-1] == '[':
+            elif ch == "]":
+                if stack and stack[-1] == "[":
                     stack.pop()
 
         # Close unterminated string
@@ -298,11 +299,12 @@ class IntentExtractor:
 
         # Close unclosed brackets in reverse order
         for bracket in reversed(stack):
-            text += '}' if bracket == '{' else ']'
+            text += "}" if bracket == "{" else "]"
 
         # Remove trailing commas before } or ]
         import re
-        text = re.sub(r',\s*([}\]])', r'\1', text)
+
+        text = re.sub(r",\s*([}\]])", r"\1", text)
 
         return text
 
@@ -318,7 +320,7 @@ class IntentExtractor:
         # Strip trailing non-JSON content
         end_idx = json_str.rfind("}")
         if end_idx != -1:
-            json_str = json_str[:end_idx + 1]
+            json_str = json_str[: end_idx + 1]
 
         # Try direct parse first
         try:
@@ -337,10 +339,7 @@ class IntentExtractor:
         return None
 
     def _build_manifest(
-        self,
-        extracted_data: dict,
-        session_id: str,
-        user_id: Optional[str]
+        self, extracted_data: dict, session_id: str, user_id: Optional[str]
     ) -> IntentManifest:
         """
         Build IntentManifest from extracted data.
@@ -372,24 +371,34 @@ class IntentExtractor:
                 except ValueError:
                     pass
 
+        constraints_raw = extracted_data.get("constraints", [])
+        if isinstance(constraints_raw, str):
+            constraints = [constraints_raw]
+        elif isinstance(constraints_raw, list):
+            constraints = [str(c) for c in constraints_raw]
+        else:
+            constraints = []
+
+        scope_raw = extracted_data.get("scope", "")
+        if isinstance(scope_raw, (dict, list)):
+            scope_str = json.dumps(scope_raw)
+        else:
+            scope_str = str(scope_raw)
+
         # Build manifest with defaults
         return IntentManifest(
             declared_intent=declared_intent,
             allowed_actions=allowed_actions,
             forbidden_actions=forbidden_actions,
-            scope=extracted_data.get("scope", ""),
-            constraints=extracted_data.get("constraints", []),
+            scope=scope_str,
+            constraints=constraints,
             risk_ceiling=float(extracted_data.get("risk_ceiling", 0.3)),
             session_id=session_id,
             user_id=user_id,
-            context=extracted_data.get("context", {})
+            context=extracted_data.get("context", {}),
         )
 
-    def _estimate_confidence(
-        self,
-        extracted_data: dict,
-        warnings: list[str]
-    ) -> float:
+    def _estimate_confidence(self, extracted_data: dict, warnings: list[str]) -> float:
         """
         Estimate confidence of extraction based on data quality.
 
@@ -439,10 +448,7 @@ class SyncIntentExtractor:
         return self._loop
 
     def extract_intent(
-        self,
-        user_input: str,
-        session_id: str,
-        user_id: Optional[str] = None
+        self, user_input: str, session_id: str, user_id: Optional[str] = None
     ) -> IntentExtractionResult:
         loop = self._get_loop()
         return loop.run_until_complete(

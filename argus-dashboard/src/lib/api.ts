@@ -53,7 +53,14 @@ export const api = {
     request(`${API_BASE}/api/dashboard/stats`),
 
   exportComplianceReport: (sessionId: string, format: string = "json") =>
-    request(`${API_BASE}/api/compliance/export/${sessionId}?format=${format}`)
+    request(`${API_BASE}/api/compliance/export/${sessionId}?format=${format}`),
+
+  playgroundEvaluate: (userInput: string) =>
+    request(`${API_BASE}/api/playground/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_input: userInput })
+    })
 }
 
 export function subscribeToFeed(onEvent: (event: any) => void): EventSource {

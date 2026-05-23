@@ -16,16 +16,18 @@ from pydantic import BaseModel, Field
 
 class GeminiProConfig(BaseModel):
     """Gemini Pro API configuration."""
+
     api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    model_name: str = Field(default="gemini-2.0-pro")
+    model_name: str = Field(default="gemini-2.5-pro")
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=1024)
-    timeout_seconds: int = Field(default=30)
+    max_tokens: int = Field(default=8192)
+    timeout_seconds: int = Field(default=60)
     max_retries: int = Field(default=3)
 
 
 class ExplanationEngineConfig(BaseModel):
     """Main configuration for Explanation Engine."""
+
     gemini_pro: GeminiProConfig = Field(default_factory=GeminiProConfig)
     latency_target_ms: float = Field(default=2000.0)
     enable_deep_analysis: bool = Field(default=True)
@@ -35,8 +37,9 @@ class ExplanationEngineConfig(BaseModel):
 @dataclass
 class ExplanationPromptConfig:
     """Configuration for explanation generation prompts."""
+
     temperature: float = 0.3
-    max_output_tokens: int = 1024
+    max_output_tokens: int = 8192
 
     system_prompt: str = """You are ARGUS's Explanation Engine. Your role is to analyze
 intent-action mismatches and provide clear, actionable explanations for security analysts.
@@ -49,7 +52,8 @@ Focus on:
 
 Be concise but thorough. Use plain language, not security jargon."""
 
-    mismatch_template: str = """Analyze the following intent-action mismatch and provide an explanation.
+    mismatch_template: str = """\
+Analyze the following intent-action mismatch and provide an explanation.
 
 DECLARED INTENT:
 - Intent: {intent}
@@ -96,15 +100,15 @@ def load_config() -> ExplanationEngineConfig:
     return ExplanationEngineConfig(
         gemini_pro=GeminiProConfig(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model_name=os.getenv("GEMINI_PRO_MODEL", "gemini-2.0-pro"),
+            model_name=os.getenv("GEMINI_PRO_MODEL", "gemini-2.5-pro"),
             temperature=0.3,
-            max_tokens=1024,
-            timeout_seconds=30,
-            max_retries=3
+            max_tokens=8192,
+            timeout_seconds=60,
+            max_retries=3,
         ),
         latency_target_ms=float(os.getenv("EXPLANATION_LATENCY_TARGET_MS", "2000")),
         enable_deep_analysis=os.getenv("ENABLE_DEEP_ANALYSIS", "true").lower() == "true",
-        include_remediation_suggestions=os.getenv("INCLUDE_REMEDIATION", "true").lower() == "true"
+        include_remediation_suggestions=os.getenv("INCLUDE_REMEDIATION", "true").lower() == "true",
     )
 
 

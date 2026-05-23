@@ -6,13 +6,8 @@ Layer 3B of ARGUS architecture - generates human-readable explanations
 for intent-action mismatches using Gemini Pro.
 """
 
-from .engine import (
-    ExplanationEngine,
-    SyncExplanationEngine,
-    MismatchExplanation
-)
-
-from .config import get_config, get_prompt_config, ExplanationEngineConfig
+from .config import ExplanationEngineConfig, get_config, get_prompt_config
+from .engine import ExplanationEngine, MismatchExplanation, SyncExplanationEngine
 
 __all__ = [
     # Engine
@@ -22,5 +17,5 @@ __all__ = [
     # Config
     "get_config",
     "get_prompt_config",
-    "ExplanationEngineConfig"
+    "ExplanationEngineConfig",
 ]

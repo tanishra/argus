@@ -5,16 +5,16 @@ Tests for Intent Engine
 Unit tests for the Intent Engine layer.
 """
 
+
 import pytest
-from datetime import datetime, timezone
 
 from src.intent_engine.models import (
-    IntentManifest,
-    IntentExtractionResult,
-    IntentCategory,
     ActionType,
+    IntentCategory,
+    IntentExtractionResult,
+    IntentManifest,
     RiskLevel,
-    create_conservative_manifest
+    create_conservative_manifest,
 )
 
 
@@ -93,8 +93,8 @@ class TestIntentManifest:
         # Forbidden takes precedence over allowed
         assert manifest.is_action_allowed(ActionType.FORWARD_EMAIL) == False
 
-    def test_empty_allowed_actions_means_all_allowed(self):
-        """Test that empty allowed_actions means everything is allowed (within constraints)."""
+    def test_empty_allowed_actions_forbids_all(self):
+        """Test that empty allowed_actions forbids everything (fail-secure)."""
         manifest = IntentManifest(
             declared_intent=IntentCategory.GENERAL_CONVERSATION,
             allowed_actions=[],  # Empty
@@ -102,9 +102,9 @@ class TestIntentManifest:
             session_id="test"
         )
 
-        # Without explicit forbidden, allowed
-        assert manifest.is_action_allowed(ActionType.READ_EMAIL) == True
-        assert manifest.is_action_allowed(ActionType.WRITE_REPLY) == True
+        # Without explicit allowed, everything is forbidden (fail-secure)
+        assert manifest.is_action_allowed(ActionType.READ_EMAIL) == False
+        assert manifest.is_action_allowed(ActionType.WRITE_REPLY) == False
 
         # Forbidden still applies
         assert manifest.is_action_allowed(ActionType.DELETE_EMAIL) == False
@@ -232,13 +232,15 @@ class TestIntentExtractionResult:
 
         high_result = IntentExtractionResult(
             manifest=manifest,
-            confidence=0.85
+            confidence=0.85,
+            extraction_time_ms=150.0
         )
         assert high_result.is_high_confidence() == True
 
         low_result = IntentExtractionResult(
             manifest=manifest,
-            confidence=0.5
+            confidence=0.5,
+            extraction_time_ms=150.0
         )
         assert low_result.is_high_confidence() == False
 
@@ -252,13 +254,15 @@ class TestIntentExtractionResult:
         # Low confidence
         assert IntentExtractionResult(
             manifest=manifest,
-            confidence=0.3
+            confidence=0.3,
+            extraction_time_ms=150.0
         ).should_requester_review() == True
 
         # Fallback used
         assert IntentExtractionResult(
             manifest=manifest,
             confidence=0.8,
+            extraction_time_ms=150.0,
             fallback_used=True
         ).should_requester_review() == True
 
@@ -266,6 +270,7 @@ class TestIntentExtractionResult:
         assert IntentExtractionResult(
             manifest=manifest,
             confidence=0.8,
+            extraction_time_ms=150.0,
             fallback_used=False
         ).should_requester_review() == False
 
@@ -300,7 +305,7 @@ class TestEnumValues:
         assert category == IntentCategory.CUSTOMER_SERVICE
 
     def test_invalid_intent_category(self):
-        """Test handling invalid intent category."""
+        """Test handling invalid intent category via _missing_ fallback."""
         category = IntentCategory("invalid_category")
         assert category == IntentCategory.UNKNOWN
 

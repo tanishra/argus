@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class IntentCategory(str, Enum):
     """Predefined intent categories for classification."""
+
     CUSTOMER_SERVICE = "customer_service"
     EMAIL_MANAGEMENT = "email_management"
     CODE_REVIEW = "code_review"
@@ -37,9 +38,14 @@ class IntentCategory(str, Enum):
     CLINICAL_REVIEW = "clinical_review"
     UNKNOWN = "unknown"
 
+    @classmethod
+    def _missing_(cls, value):
+        return cls.UNKNOWN
+
 
 class ActionType(str, Enum):
     """Predefined action types that agents can perform."""
+
     # Communication
     READ_EMAIL = "read_email"
     WRITE_REPLY = "write_reply"
@@ -84,10 +90,11 @@ class ActionType(str, Enum):
 
 class RiskLevel(str, Enum):
     """Risk classification levels."""
-    LOW = "low"           # 0.0 - 0.3
-    MEDIUM = "medium"     # 0.3 - 0.7
-    HIGH = "high"         # 0.7 - 0.9
-    CRITICAL = "critical" # 0.9 - 1.0
+
+    LOW = "low"  # 0.0 - 0.3
+    MEDIUM = "medium"  # 0.3 - 0.7
+    HIGH = "high"  # 0.7 - 0.9
+    CRITICAL = "critical"  # 0.9 - 1.0
 
 
 class IntentManifest(BaseModel):
@@ -110,59 +117,44 @@ class IntentManifest(BaseModel):
     """
 
     # Core identity
-    declared_intent: IntentCategory = Field(
-        description="Primary intent category"
-    )
+    declared_intent: IntentCategory = Field(description="Primary intent category")
 
     # Authorization boundaries
     allowed_actions: list[ActionType] = Field(
-        default_factory=list,
-        description="Action types explicitly authorized by user"
+        default_factory=list, description="Action types explicitly authorized by user"
     )
 
     forbidden_actions: list[ActionType] = Field(
-        default_factory=list,
-        description="Action types explicitly prohibited by user"
+        default_factory=list, description="Action types explicitly prohibited by user"
     )
 
     # Scope and constraints
-    scope: str = Field(
-        default="",
-        description="Boundaries/count limits for the authorized scope"
-    )
+    scope: str = Field(default="", description="Boundaries/count limits for the authorized scope")
 
     constraints: list[str] = Field(
-        default_factory=list,
-        description="Custom constraints beyond action type lists"
+        default_factory=list, description="Custom constraints beyond action type lists"
     )
 
     # Risk management
     risk_ceiling: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="Maximum acceptable risk score (0.0-1.0)"
+        default=0.5, ge=0.0, le=1.0, description="Maximum acceptable risk score (0.0-1.0)"
     )
 
     # Session metadata
-    session_id: str = Field(
-        description="Unique session identifier"
-    )
+    session_id: str = Field(description="Unique session identifier")
 
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="ISO8601 timestamp of manifest creation"
+        description="ISO8601 timestamp of manifest creation",
     )
 
     user_id: Optional[str] = Field(
-        default=None,
-        description="Optional user identifier for multi-user systems"
+        default=None, description="Optional user identifier for multi-user systems"
     )
 
     # Additional context
     context: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional context extracted from user input"
+        default_factory=dict, description="Additional context extracted from user input"
     )
 
     @field_validator("allowed_actions", "forbidden_actions", mode="before")
@@ -213,7 +205,7 @@ class IntentManifest(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert manifest to dictionary."""
-        return self.model_dump(mode='json')
+        return self.model_dump(mode="json")
 
     @classmethod
     def from_json(cls, json_str: str) -> IntentManifest:
@@ -241,7 +233,7 @@ class IntentManifest(BaseModel):
                 "risk_ceiling": self.risk_ceiling,
                 "session_id": self.session_id,
                 "timestamp": self.timestamp.isoformat(),
-                "constraints": self.constraints
+                "constraints": self.constraints,
             }
         }
 
@@ -254,7 +246,7 @@ class IntentManifest(BaseModel):
             "forbidden_count": len(self.forbidden_actions),
             "risk_ceiling": self.risk_ceiling,
             "risk_level": self.get_risk_level().value,
-            "scope": self.scope or "unspecified"
+            "scope": self.scope or "unspecified",
         }
 
 
@@ -267,24 +259,15 @@ class IntentExtractionResult(BaseModel):
 
     manifest: IntentManifest
     confidence: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Confidence score of the extraction (0.0-1.0)"
+        ge=0.0, le=1.0, description="Confidence score of the extraction (0.0-1.0)"
     )
-    extraction_time_ms: float = Field(
-        description="Time taken to extract intent in milliseconds"
-    )
+    extraction_time_ms: float = Field(description="Time taken to extract intent in milliseconds")
     raw_model_output: Optional[str] = Field(
-        default=None,
-        description="Raw model output for debugging"
+        default=None, description="Raw model output for debugging"
     )
-    warnings: list[str] = Field(
-        default_factory=list,
-        description="Any warnings during extraction"
-    )
+    warnings: list[str] = Field(default_factory=list, description="Any warnings during extraction")
     fallback_used: bool = Field(
-        default=False,
-        description="Whether fallback conservative manifest was used"
+        default=False, description="Whether fallback conservative manifest was used"
     )
 
     def is_high_confidence(self) -> bool:
@@ -306,7 +289,7 @@ DEFAULT_CONSERVATIVE_MANIFEST = {
     "risk_ceiling": 0.1,  # Very conservative
     "session_id": "fallback_session",
     "user_id": None,
-    "context": {"fallback_reason": "extraction_failed"}
+    "context": {"fallback_reason": "extraction_failed"},
 }
 
 

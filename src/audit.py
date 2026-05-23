@@ -78,7 +78,7 @@ async def log_event(
 async def backfill_file_to_db():
     """Migrate existing file-based audit entries to the database."""
     try:
-        from .database import save_audit_entry_db, load_recent_audit_entries_db
+        from .database import load_recent_audit_entries_db, save_audit_entry_db
 
         existing_db = await load_recent_audit_entries_db(limit=1)
         if existing_db:

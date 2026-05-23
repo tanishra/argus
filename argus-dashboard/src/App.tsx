@@ -6,6 +6,7 @@ import CompliancePage from './pages/CompliancePage'
 import DemoPage from './pages/DemoPage'
 import { Shield, ListChecks, FileText, PlayCircle, Menu, X, Home, Sun, Moon } from 'lucide-react'
 import { useTheme } from './ThemeContext'
+import { cn } from './lib/utils'
 
 const navItems = [
   { name: 'Review Queue', path: '/reviews', icon: ListChecks, label: 'Pending reviews' },
@@ -25,55 +26,65 @@ function Navbar() {
   }, [])
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      scrolled ? 'bg-white/85 backdrop-blur-xl border-b border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)]' : 'bg-transparent'
-    }`}>
+    <header className={cn(
+      "fixed top-0 left-0 right-0 z-50 transition-colors duration-300 border-b",
+      scrolled ? "bg-background/80 backdrop-blur-md border-border" : "bg-transparent border-transparent"
+    )}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
-          <a href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-[0_2px_8px_rgba(79,70,229,0.15)] transition-all duration-300 group-hover:shadow-[0_4px_16px_rgba(79,70,229,0.25)] group-hover:scale-105">
-              <Shield className="w-[18px] h-[18px] text-white" strokeWidth={2.5} />
-            </div>
-            <span className="text-base font-semibold tracking-tight text-foreground">ARGUS</span>
+          <a href="/" className="flex items-center gap-2 group">
+            <span className="text-2xl font-extrabold tracking-tighter text-foreground lowercase transition-transform group-hover:scale-[1.02]">argus.</span>
           </a>
 
-          <div className="hidden md:flex items-center gap-1">
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-all duration-200"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+          <div className="hidden md:flex items-center gap-6">
             {navItems.map((item) => {
               const active = location.pathname === item.path
               return (
                 <a
                   key={item.path}
                   href={item.path}
-                  className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                    active
-                      ? 'text-primary bg-primary/[0.04]'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/70'
-                  }`}
+                  className={cn(
+                    "text-sm transition-colors",
+                    active ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                  )}
                 >
                   {item.name}
                 </a>
               )
             })}
-            <div className="w-px h-5 bg-border/60 mx-2" />
+            <div className="w-px h-4 bg-border" />
             <a
               href="/demo"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] transition-all duration-300"
+              className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:opacity-80 transition-opacity"
             >
               <PlayCircle className="w-4 h-4" />
               Live Demo
             </a>
+            <div className="flex items-center gap-3 ml-2 border-l border-border pl-5">
+              <a 
+                href="https://github.com/tanishra/argus" 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="GitHub Repository"
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+              </a>
+              <button
+                onClick={toggleTheme}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-secondary transition-colors"
+            className="md:hidden text-foreground p-2"
             aria-label="Toggle menu"
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -82,40 +93,24 @@ function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden bg-white border-b border-border/40 px-4 pb-4 pt-2 space-y-1 animate-fade-in shadow-sm">
+        <div className="md:hidden bg-background border-b border-border px-6 py-4 space-y-4">
+          {[...navItems, { name: 'Live Demo', path: '/demo', icon: PlayCircle, label: '' }].map((item) => (
+            <a
+              key={item.path}
+              href={item.path}
+              onClick={() => setMobileOpen(false)}
+              className="block text-sm font-medium text-foreground"
+            >
+              {item.name}
+            </a>
+          ))}
           <button
             onClick={() => { toggleTheme(); setMobileOpen(false) }}
-            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
-          <div className="w-full h-px bg-border/40 my-1" />
-          {[...navItems, { name: 'Live Demo', path: '/demo', icon: PlayCircle, label: 'Interactive playground' }].map((item) => {
-            const active = location.pathname === item.path
-            const Icon = item.icon
-            const isDemo = item.path === '/demo'
-            return (
-              <a
-                key={item.path}
-                href={item.path}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  active
-                    ? isDemo ? 'bg-primary text-primary-foreground' : 'bg-primary/5 text-primary'
-                    : isDemo
-                      ? 'bg-primary/5 text-primary hover:bg-primary/10'
-                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <div>
-                  <span>{item.name}</span>
-                  <span className="block text-xs text-inherit opacity-70">{item.label}</span>
-                </div>
-              </a>
-            )
-          })}
         </div>
       )}
     </header>
@@ -124,12 +119,11 @@ function Navbar() {
 
 function NotFound() {
   return (
-    <div className="pt-16 min-h-screen flex items-center justify-center">
+    <div className="pt-24 min-h-screen flex items-center justify-center">
       <div className="text-center px-6">
-        <h1 className="text-6xl font-bold text-gradient mb-4">404</h1>
-        <p className="text-lg text-muted-foreground mb-6">This page doesn't exist.</p>
-        <a href="/" className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] transition-all">
-          <Home className="w-4 h-4" />
+        <h1 className="text-4xl font-semibold mb-4 text-foreground">404</h1>
+        <p className="text-muted-foreground mb-8">This page doesn't exist.</p>
+        <a href="/" className="text-sm font-medium text-foreground hover:underline">
           Back to Dashboard
         </a>
       </div>
@@ -140,7 +134,7 @@ function NotFound() {
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-background font-sans">
+      <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-primary-foreground">
         <Navbar />
         <Routes>
           <Route path="/" element={<Dashboard />} />

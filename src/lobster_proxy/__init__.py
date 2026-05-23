@@ -7,13 +7,13 @@ that compares declared intent against detected action metadata.
 """
 
 from .engine import (
+    Decision,
+    DetectedAction,
     LobsterTrapEngine,
     LobsterTrapProxy,
-    DetectedAction,
     PolicyEvaluation,
-    Decision,
     RiskThreshold,
-    get_proxy
+    get_proxy,
 )
 
 __all__ = [
@@ -23,5 +23,5 @@ __all__ = [
     "PolicyEvaluation",
     "Decision",
     "RiskThreshold",
-    "get_proxy"
+    "get_proxy",
 ]

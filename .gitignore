@@ -162,6 +162,10 @@ uploads/
 temp/
 
 
+# Sensitive files (should never be committed)
+*.pem
+*.key
+
 # ========== Keep These =========
 
 # Keep these files in git
