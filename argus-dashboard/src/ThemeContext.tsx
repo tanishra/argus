@@ -8,22 +8,19 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
+  theme: 'dark',
   toggleTheme: () => {}
 })
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('argus-theme')
-    return (saved === 'light' || saved === 'dark') ? saved : 'light'
-  })
+  const [theme, setTheme] = useState<Theme>('dark')
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    localStorage.setItem('argus-theme', theme)
-  }, [theme])
+    document.documentElement.classList.toggle('dark', true)
+    localStorage.setItem('argus-theme', 'dark')
+  }, [])
 
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light')
+  const toggleTheme = () => {} // Disabled
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

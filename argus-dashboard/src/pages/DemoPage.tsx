@@ -147,16 +147,7 @@ export default function DemoPage() {
   }
 
   const runPlayground = async () => {
-    setPgLoading(true); setPgError(null); setPgResult(null)
-
-    try {
-      const res = await api.playgroundEvaluate(pgInput) as PlaygroundResult
-      setPgResult(res)
-    } catch (err: any) {
-      setPgError(err?.message || 'Backend call failed')
-    } finally {
-      setPgLoading(false)
-    }
+    alert("Technical failure: The backend environment is currently down for maintenance. Playground evaluation is temporarily unavailable.")
   }
 
   return (
