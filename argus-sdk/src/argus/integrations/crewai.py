@@ -48,7 +48,7 @@ def wrap_crewai_tool(tool: Any, action_type: str, target_type: str = "api") -> A
             parameters=params,
         )
 
-        decision = eval_resp.get("decision", "QUARANTINE")
+        decision = str(eval_resp.get("decision", "QUARANTINE")).upper()
         if decision in ["QUARANTINE", "DENY"]:
             raise ArgusQuarantineException(
                 message=f"Action '{action_type}' was blocked by ARGUS.",
