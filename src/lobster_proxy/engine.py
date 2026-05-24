@@ -265,6 +265,34 @@ class LobsterTrapEngine:
         if not scope:
             return None  # No scope specified means no restriction
 
+        # Handle JSON-serialized scope (e.g. {"url": "http://news.google.com"} or list of targets)
+        if scope.strip().startswith("{") or scope.strip().startswith("["):
+            try:
+                import json
+                scope_data = json.loads(scope)
+                if isinstance(scope_data, dict):
+                    found = False
+                    for val in scope_data.values():
+                        val_str = str(val)
+                        if val_str.lower() in target.lower() or target.lower() in val_str.lower():
+                            found = True
+                            break
+                    if not found:
+                        return f"Target '{target}' outside scope '{scope}'"
+                    return None
+                elif isinstance(scope_data, list):
+                    found = False
+                    for val in scope_data:
+                        val_str = str(val)
+                        if val_str.lower() in target.lower() or target.lower() in val_str.lower():
+                            found = True
+                            break
+                    if not found:
+                        return f"Target '{target}' outside scope '{scope}'"
+                    return None
+            except Exception:
+                pass
+
         # Simple scope matching (can be enhanced with regex patterns)
         # Scope examples: "customer_complaints@inbox", "src/", "analytics_db"
 
