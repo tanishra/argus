@@ -100,8 +100,8 @@ def load_config() -> ExplanationEngineConfig:
     return ExplanationEngineConfig(
         llm=LLMConfig(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model_name=os.getenv(
-                "ARGUS_PRO_MODEL", os.getenv("GEMINI_PRO_MODEL", "gemini/gemini-2.5-pro")
+            model_name=(lambda m: f"gemini/{m}" if m.startswith("gemini-") and "/" not in m else m)(
+                os.getenv("ARGUS_PRO_MODEL", os.getenv("GEMINI_PRO_MODEL", "gemini/gemini-2.5-pro"))
             ),
             temperature=0.3,
             max_tokens=8192,

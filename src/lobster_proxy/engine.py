@@ -283,6 +283,10 @@ class LobsterTrapEngine:
             if target and scope not in target:
                 return f"Target '{target}' outside database scope '{scope}'"
 
+        # General/fallback match for simple filenames or specific targets without delimiters
+        elif target and scope.lower() not in target.lower() and target.lower() not in scope.lower():
+            return f"Target '{target}' outside scope '{scope}'"
+
         return None
 
     def _calculate_risk_score(
@@ -662,10 +666,14 @@ class LobsterTrapProxy:
         ):
             decision = Decision.HUMAN_REVIEW
 
-        policy_message = (
-            binary_result.get("policy_message")
-            or "Evaluated by Lobster Trap DPI + ARGUS intent engine"
-        )
+        mismatch_str = "; ".join(mismatches) if mismatches else ""
+        if mismatch_str and decision == Decision.QUARANTINE:
+            policy_message = f"Intent mismatch detected: {mismatch_str}"
+        else:
+            policy_message = (
+                binary_result.get("policy_message")
+                or "Evaluated by Lobster Trap DPI + ARGUS intent engine"
+            )
         eval_time_ms = (time.time() - start) * 1000
 
         return PolicyEvaluation(

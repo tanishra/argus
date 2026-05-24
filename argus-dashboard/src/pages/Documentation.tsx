@@ -469,11 +469,11 @@ API_KEY=my-secret-gateway-password`}
               <p className="text-base text-muted-foreground leading-relaxed mb-4 font-light">
                 Now open a new terminal window in your <strong>separate AI agent project directory</strong> and install the lightweight Python SDK:
               </p>
-              <CodeBlock id="install-pip" language="bash" code="pip install argus-sdk" />
+              <CodeBlock id="install-pip" language="bash" code="pip install argus-shield" />
               <p className="text-base text-muted-foreground leading-relaxed mb-4 font-light">
                 Or if you use <code>uv</code> inside your agent project:
               </p>
-              <CodeBlock id="install-uv" language="bash" code="uv add argus-sdk" />
+              <CodeBlock id="install-uv" language="bash" code="uv add argus-shield" />
 
               <h4 className="text-lg font-bold text-foreground mb-2 mt-6">Select Your Hybrid Setup Mode (0-Friction)</h4>
               <p className="text-base text-muted-foreground leading-relaxed mb-4 font-light">

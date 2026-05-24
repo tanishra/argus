@@ -21,7 +21,8 @@ def test_sync_client_extract_intent():
         assert result["manifest"]["allowed_actions"] == ["read_file"]
 
         mock_post.assert_called_once_with(
-            "/api/intent/extract", json={"user_prompt": "Read diary.txt", "user_id": "user1"}
+            "/api/intent/extract",
+            json={"user_prompt": "Read diary.txt", "user_input": "Read diary.txt", "user_id": "user1"},
         )
         client.close()
 
@@ -43,7 +44,7 @@ def test_sync_client_evaluate_action():
 
         assert result["decision"] == "ALLOW"
         mock_post.assert_called_once_with(
-            "/api/evaluate",
+            "/api/action/evaluate",
             json={
                 "session_id": "test-session",
                 "action_type": "read_file",
@@ -90,7 +91,8 @@ async def test_async_client_extract_intent():
 
         assert result["session_id"] == "async-session"
         mock_post.assert_called_once_with(
-            "/api/intent/extract", json={"user_prompt": "Send report", "user_id": "user2"}
+            "/api/intent/extract",
+            json={"user_prompt": "Send report", "user_input": "Send report", "user_id": "user2"},
         )
         await client.close()
 
@@ -115,7 +117,7 @@ async def test_async_client_evaluate_action():
 
         assert result["decision"] == "QUARANTINE"
         mock_post.assert_called_once_with(
-            "/api/evaluate",
+            "/api/action/evaluate",
             json={
                 "session_id": "async-session",
                 "action_type": "send_email",

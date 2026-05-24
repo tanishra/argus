@@ -79,10 +79,12 @@ class LocalEvaluationEngine:
                     matched = True
                     break
             
-            # For actions like read_file or fetch_url, if targets were specified, limit to those targets
-            if action_type in ["read_file", "write_file", "send_email", "fetch_url"] and not matched:
-                # If target is generic, let's allow it, but if it contradicts the prompt targets, deny
-                pass
+            # For actions like read_file, fetch_url, or run_command, if targets were specified, limit to those targets
+            if action_type in ["read_file", "write_file", "send_email", "fetch_url", "run_command"] and not matched:
+                return {
+                    "decision": "QUARANTINE",
+                    "reason": f"Target '{target}' is not authorized by the user prompt intent. Authorized targets: {', '.join(restricted_targets)}"
+                }
 
         # If LLM keys are available, run a semantic audit check for critical/sensitive actions
         if action_type in ["run_command", "send_email"] and (self.gemini_key or self.openai_key):

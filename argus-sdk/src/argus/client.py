@@ -11,7 +11,7 @@ class ArgusClient:
     """
 
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        self.base_url = (base_url or os.getenv("ARGUS_BASE_URL", "https://tanishra-argus.hf.space")).rstrip(
+        self.base_url = (base_url or os.getenv("ARGUS_BASE_URL", "https://tanishrajput-argus.hf.space")).rstrip(
             "/"
         )
         self.api_key = api_key or os.getenv("ARGUS_API_KEY", "")
@@ -20,13 +20,16 @@ class ArgusClient:
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
-        self.http = httpx.Client(base_url=self.base_url, headers=headers)
+        self.http = httpx.Client(base_url=self.base_url, headers=headers, timeout=60.0)
 
     def extract_intent(self, user_prompt: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Sends a user prompt to the ARGUS Gateway to extract an Intent Manifest and start a session.
         """
-        payload = {"user_prompt": user_prompt}
+        payload = {
+            "user_prompt": user_prompt,
+            "user_input": user_prompt,
+        }
         if user_id:
             payload["user_id"] = user_id
 
@@ -59,7 +62,7 @@ class ArgusClient:
         }
 
         try:
-            resp = self.http.post("/api/evaluate", json=payload)
+            resp = self.http.post("/api/action/evaluate", json=payload)
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -77,7 +80,7 @@ class AsyncArgusClient:
     """
 
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        self.base_url = (base_url or os.getenv("ARGUS_BASE_URL", "https://tanishra-argus.hf.space")).rstrip(
+        self.base_url = (base_url or os.getenv("ARGUS_BASE_URL", "https://tanishrajput-argus.hf.space")).rstrip(
             "/"
         )
         self.api_key = api_key or os.getenv("ARGUS_API_KEY", "")
@@ -86,12 +89,15 @@ class AsyncArgusClient:
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
-        self.http = httpx.AsyncClient(base_url=self.base_url, headers=headers)
+        self.http = httpx.AsyncClient(base_url=self.base_url, headers=headers, timeout=60.0)
 
     async def extract_intent(
         self, user_prompt: str, user_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        payload = {"user_prompt": user_prompt}
+        payload = {
+            "user_prompt": user_prompt,
+            "user_input": user_prompt,
+        }
         if user_id:
             payload["user_id"] = user_id
 
@@ -121,7 +127,7 @@ class AsyncArgusClient:
         }
 
         try:
-            resp = await self.http.post("/api/evaluate", json=payload)
+            resp = await self.http.post("/api/action/evaluate", json=payload)
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:

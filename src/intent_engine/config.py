@@ -95,8 +95,8 @@ def load_config() -> IntentEngineConfig:
     return IntentEngineConfig(
         llm=LLMConfig(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model_name=os.getenv(
-                "ARGUS_LLM_MODEL", os.getenv("GEMINI_MODEL", "gemini/gemini-2.5-flash")
+            model_name=(lambda m: f"gemini/{m}" if m.startswith("gemini-") and "/" not in m else m)(
+                os.getenv("ARGUS_LLM_MODEL", os.getenv("GEMINI_MODEL", "gemini/gemini-2.5-flash"))
             ),
             temperature=0.1,
             max_tokens=8192,

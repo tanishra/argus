@@ -9,7 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "argus",
-    "argus-sdk",
+    "argus-shield",
 ]
 
 [[package]]
@@ -233,8 +233,8 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [[package]]
-name = "argus-sdk"
-version = "0.1.0"
+name = "argus-shield"
+version = "0.1.5"
 source = { editable = "argus-sdk" }
 dependencies = [
     { name = "httpx" },
