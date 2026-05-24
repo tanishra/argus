@@ -190,17 +190,32 @@ class IntentManifest(BaseModel):
         return RiskLevel.CRITICAL
 
     def is_action_allowed(self, action_type: ActionType) -> bool:
-        """Check if an action type is allowed by this manifest."""
+        """Check if an action type is allowed by this manifest with support for synonyms."""
+        # Map equivalent action types to handle SDK-backend casing and terminology differences
+        synonyms = {
+            ActionType.FETCH_URL: [ActionType.FETCH_URL, ActionType.ACCESS_WEB],
+            ActionType.ACCESS_WEB: [ActionType.FETCH_URL, ActionType.ACCESS_WEB],
+            ActionType.RUN_COMMAND: [ActionType.RUN_COMMAND, ActionType.EXECUTE_CODE],
+            ActionType.EXECUTE_CODE: [ActionType.RUN_COMMAND, ActionType.EXECUTE_CODE],
+        }
+
+        check_types = synonyms.get(action_type, [action_type])
+
         # First check forbidden actions (they take precedence)
-        if action_type in self.forbidden_actions:
-            return False
+        for t in check_types:
+            if t in self.forbidden_actions:
+                return False
 
         # Empty allowed_actions means forbid everything (fail-secure per ADR-006)
         if not self.allowed_actions:
             return False
 
-        # Otherwise, action must be in allowed list
-        return action_type in self.allowed_actions
+        # Check allowed list
+        for t in check_types:
+            if t in self.allowed_actions:
+                return True
+
+        return False
 
     def to_json(self) -> str:
         """Serialize manifest to JSON string."""
