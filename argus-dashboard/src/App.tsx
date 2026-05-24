@@ -124,16 +124,6 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-primary-foreground flex flex-col">
         <Navbar />
-        
-        {/* Technical Failure Banner */}
-        <div className="w-full bg-destructive/10 border-b border-destructive/20 pt-16">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-center gap-3 text-destructive">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <span className="text-sm font-medium">
-              We are currently experiencing a technical failure with our infrastructure. Live demo and dashboard data are temporarily unavailable.
-            </span>
-          </div>
-        </div>
 
         <main className="flex-1">
           <Routes>

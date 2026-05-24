@@ -48,10 +48,6 @@ export function ComplianceReport() {
   const [exporting, setExporting] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  const handleExport = async (format: string) => {
-    alert("Technical failure: The backend environment is currently down for maintenance. Reports cannot be generated at this time.")
-  }
-
   return (
     <div className="space-y-6">
       <div className="premium-card p-8 shadow-premium">
@@ -63,27 +59,29 @@ export function ComplianceReport() {
           <p className="text-sm text-muted-foreground mt-2 font-medium">Export automated audit trails for regulatory compliance.</p>
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-6 mb-2">
+        <div className="grid sm:grid-cols-3 gap-6 mb-6">
           {formats.map(btn => (
-            <button
+            <div
               key={btn.value}
-              onClick={() => handleExport(btn.value)}
-              disabled={exporting !== null}
-              className={`group flex flex-col items-start gap-4 p-5 bg-background rounded-xl border transition-all duration-300 hover:shadow-premium disabled:opacity-50 ${btn.border}`}
+              className="group flex flex-col items-start gap-4 p-5 bg-muted/20 rounded-xl border border-border/80 opacity-60 cursor-not-allowed"
             >
-              <div className={`w-12 h-12 rounded-lg bg-muted flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:bg-primary/10`}>
-                {exporting === btn.value ? (
-                  <div className="w-5 h-5 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
-                ) : (
-                  <btn.icon className={`w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors`} />
-                )}
+              <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                <btn.icon className="w-6 h-6 text-muted-foreground" />
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold tracking-tight text-foreground">{btn.label}</p>
                 <p className="text-xs text-muted-foreground mt-1 font-medium">{btn.desc}</p>
               </div>
-            </button>
+            </div>
           ))}
+        </div>
+
+        <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+          <Clock className="w-5 h-5 text-primary shrink-0 animate-pulse" />
+          <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+            <span className="font-bold text-foreground block mb-0.5">Feature Under Progress</span>
+            Automated compliance report exports are currently under development. Structured regulatory audit trails will be fully queryable in the next release.
+          </p>
         </div>
 
         {exportError && (

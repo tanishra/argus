@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, type ComponentType } from 'react'
 import { api } from '../lib/api'
 import {
   Shield, AlertTriangle, CheckCircle2, Play, RotateCcw,
-  Cpu, FileSearch, Network, XCircle, UserCheck, Filter, Clock, ArrowRight, Activity, Terminal
+  Cpu, FileSearch, Network, XCircle, UserCheck, Filter, Clock, ArrowRight, Activity, Terminal, ShieldAlert
 } from 'lucide-react'
+import { cn } from '../lib/utils'
 
 interface DemoLog {
   timestamp: string
@@ -103,6 +104,30 @@ export default function DemoPage() {
   const [pgError, setPgError] = useState<string | null>(null)
   const [pgResult, setPgResult] = useState<PlaygroundResult | null>(null)
 
+  // Playground simulation states
+  const [pgUnprotectedLinesCount, setPgUnprotectedLinesCount] = useState(0)
+  const [pgProtectedLinesCount, setPgProtectedLinesCount] = useState(0)
+  const [pgShowIntent, setPgShowIntent] = useState(false)
+  const [pgShowDecision, setPgShowDecision] = useState(false)
+  const [pgIsSimulating, setPgIsSimulating] = useState(false)
+
+  // Scroll references for playground terminal logs
+  const pgUnprotectedScrollRef = useRef<HTMLDivElement | null>(null)
+  const pgProtectedScrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Auto scroll effects for playground terminals
+  useEffect(() => {
+    if (pgUnprotectedScrollRef.current) {
+      pgUnprotectedScrollRef.current.scrollTop = pgUnprotectedScrollRef.current.scrollHeight
+    }
+  }, [pgUnprotectedLinesCount])
+
+  useEffect(() => {
+    if (pgProtectedScrollRef.current) {
+      pgProtectedScrollRef.current.scrollTop = pgProtectedScrollRef.current.scrollHeight
+    }
+  }, [pgProtectedLinesCount])
+
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
@@ -147,7 +172,61 @@ export default function DemoPage() {
   }
 
   const runPlayground = async () => {
-    alert("Technical failure: The backend environment is currently down for maintenance. Playground evaluation is temporarily unavailable.")
+    if (!pgInput.trim()) return
+    setPgLoading(true)
+    setPgError(null)
+    setPgResult(null)
+    setPgUnprotectedLinesCount(0)
+    setPgProtectedLinesCount(0)
+    setPgShowIntent(false)
+    setPgShowDecision(false)
+    setPgIsSimulating(false)
+
+    try {
+      const res = await api.playgroundEvaluate(pgInput) as PlaygroundResult
+      if (mountedRef.current) {
+        setPgResult(res)
+        setPgLoading(false)
+        setPgIsSimulating(true)
+
+        // 1. Reveal Intent Manifest
+        setPgShowIntent(true)
+        await new Promise(r => setTimeout(r, 800))
+        if (!mountedRef.current) return
+
+        // 2. Unprotected Agent Console step-by-step
+        const isQuar = res.policy.decision?.toUpperCase() === 'QUARANTINE'
+        const maxUnprotected = isQuar ? 6 : 5
+        for (let i = 1; i <= maxUnprotected; i++) {
+          setPgUnprotectedLinesCount(i)
+          await new Promise(r => setTimeout(r, i === 2 ? 1000 : 600)) // longer delay for "thought" step
+          if (!mountedRef.current) return
+        }
+
+        await new Promise(r => setTimeout(r, 600))
+        if (!mountedRef.current) return
+
+        // 3. ARGUS Protected Agent Console step-by-step
+        const maxProtected = isQuar ? 8 : 7
+        for (let i = 1; i <= maxProtected; i++) {
+          setPgProtectedLinesCount(i)
+          await new Promise(r => setTimeout(r, i === 3 ? 1200 : i === 6 ? 800 : 500)) // longer delay for "thought" and "intercepted" steps
+          if (!mountedRef.current) return
+        }
+
+        await new Promise(r => setTimeout(r, 600))
+        if (!mountedRef.current) return
+
+        // 4. Reveal Gateway Security Decision card
+        setPgShowDecision(true)
+        setPgIsSimulating(false)
+      }
+    } catch (err: any) {
+      if (mountedRef.current) {
+        setPgError(err.message || "Failed to connect to the ARGUS Gateway API. Please check your network or try again.")
+        setPgLoading(false)
+      }
+    }
   }
 
   return (
@@ -247,19 +326,20 @@ export default function DemoPage() {
               <textarea
                 value={pgInput}
                 onChange={e => setPgInput(e.target.value)}
+                disabled={pgLoading || pgIsSimulating}
                 placeholder="Enter a prompt to test..."
-                className="w-full bg-background border border-border rounded-xl py-4 pl-12 pr-4 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary min-h-[120px] resize-y transition-all duration-200 shadow-inner"
+                className="w-full bg-background border border-border rounded-xl py-4 pl-12 pr-4 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary min-h-[120px] resize-y transition-all duration-200 shadow-inner disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
             <div className="flex justify-between items-center mt-5">
               <div className="flex gap-2 flex-wrap">
                 {playgroundPresets.map((p, i) => (
-                  <button key={i} onClick={() => setPgInput(p)} className="text-xs font-medium px-3 py-1.5 bg-background text-muted-foreground hover:text-foreground rounded-md border border-border transition-colors hover:border-primary/30">
+                  <button key={i} onClick={() => setPgInput(p)} disabled={pgLoading || pgIsSimulating} className="text-xs font-medium px-3 py-1.5 bg-background text-muted-foreground hover:text-foreground rounded-md border border-border transition-colors hover:border-primary/30 disabled:opacity-50 disabled:cursor-not-allowed">
                     Preset {i + 1}
                   </button>
                 ))}
               </div>
-              <button onClick={runPlayground} disabled={pgLoading || !pgInput.trim()} className="px-8 py-3 text-sm font-bold tracking-tight bg-foreground text-background rounded-xl hover:scale-105 disabled:opacity-50 transition-all duration-300 shadow-premium-md flex items-center gap-2">
+              <button onClick={runPlayground} disabled={pgLoading || pgIsSimulating || !pgInput.trim()} className="px-8 py-3 text-sm font-bold tracking-tight bg-foreground text-background rounded-xl hover:scale-105 disabled:opacity-50 transition-all duration-300 shadow-premium-md flex items-center gap-2 disabled:cursor-not-allowed disabled:hover:scale-100">
                 {pgLoading ? <><div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin"/> Evaluating...</> : 'Evaluate'}
               </button>
             </div>
@@ -284,103 +364,192 @@ export default function DemoPage() {
             {pgResult && (
               <div className="space-y-6 animate-fade-in">
                 {/* Intent Extraction Row */}
-                <div className="bg-background/80 border border-border rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6 flex items-center gap-2">
-                    <FileSearch className="w-4 h-4" /> Intent Manifest
-                  </h3>
-                  <div className="grid md:grid-cols-3 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Declared Intent</span>
-                        <div className="text-sm font-semibold text-foreground px-3 py-2 bg-muted/30 rounded border border-border/50">{pgResult.intent_extraction.manifest?.declared_intent || 'Unknown'}</div>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Scope</span>
-                        <div className="text-sm font-medium text-foreground">
-                          {(() => {
-                            const scopeStr = pgResult.intent_extraction.manifest?.scope;
-                            if (!scopeStr) return 'Unspecified';
-                            try {
-                              const parsed = JSON.parse(scopeStr);
-                              if (typeof parsed === 'object' && parsed !== null) {
-                                return (
-                                  <div className="text-xs opacity-90 space-y-1 mt-1 bg-muted/10 p-2 rounded border border-border/30">
-                                    {Object.entries(parsed).map(([k, v]) => (
-                                      <div key={k} className="break-all">
-                                        <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">{k}:</span> {String(v)}
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              }
-                            } catch {}
-                            return scopeStr;
-                          })()}
+                {pgShowIntent && (
+                  <div className="bg-background/80 border border-border rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] animate-slide-up duration-500">
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <FileSearch className="w-4 h-4" /> Intent Manifest
+                    </h3>
+                    <div className="grid md:grid-cols-3 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Declared Intent</span>
+                          <div className="text-sm font-semibold text-foreground px-3 py-2 bg-muted/30 rounded border border-border/50">{pgResult.intent_extraction.manifest?.declared_intent || 'Unknown'}</div>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Scope</span>
+                          <div className="text-sm font-medium text-foreground">
+                            {(() => {
+                              const scopeStr = pgResult.intent_extraction.manifest?.scope;
+                              if (!scopeStr) return 'Unspecified';
+                              try {
+                                const parsed = JSON.parse(scopeStr);
+                                if (typeof parsed === 'object' && parsed !== null) {
+                                  return (
+                                    <div className="text-xs opacity-90 space-y-1 mt-1 bg-muted/10 p-2 rounded border border-border/30">
+                                      {Object.entries(parsed).map(([k, v]) => (
+                                        <div key={k} className="break-all">
+                                          <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">{k}:</span> {String(v)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                              } catch {}
+                              return scopeStr;
+                            })()}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Confidence</span>
+                          <div className="text-sm font-mono text-primary font-bold">{(pgResult.intent_extraction.manifest?.confidence * 100).toFixed(0)}%</div>
                         </div>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Confidence</span>
-                        <div className="text-sm font-mono text-primary font-bold">{(pgResult.intent_extraction.manifest?.confidence * 100).toFixed(0)}%</div>
+                      <div className="space-y-4">
+                        <span className="text-[10px] font-bold text-success uppercase tracking-widest block mb-1">Allowed Actions</span>
+                        <div className="flex flex-wrap gap-2">
+                          {pgResult.intent_extraction.manifest?.allowed_actions?.length ? pgResult.intent_extraction.manifest.allowed_actions.map((act: string) => (
+                            <span key={act} className="text-[11px] font-mono px-2 py-1 bg-success/10 text-success rounded border border-success/20">{act}</span>
+                          )) : <span className="text-xs text-muted-foreground italic">None explicitly allowed</span>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-4">
-                      <span className="text-[10px] font-bold text-success uppercase tracking-widest block mb-1">Allowed Actions</span>
-                      <div className="flex flex-wrap gap-2">
-                        {pgResult.intent_extraction.manifest?.allowed_actions?.length ? pgResult.intent_extraction.manifest.allowed_actions.map((act: string) => (
-                          <span key={act} className="text-[11px] font-mono px-2 py-1 bg-success/10 text-success rounded border border-success/20">{act}</span>
-                        )) : <span className="text-xs text-muted-foreground italic">None explicitly allowed</span>}
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <span className="text-[10px] font-bold text-destructive uppercase tracking-widest block mb-1">Forbidden Actions</span>
-                      <div className="flex flex-wrap gap-2">
-                        {pgResult.intent_extraction.manifest?.forbidden_actions?.length ? pgResult.intent_extraction.manifest.forbidden_actions.map((act: string) => (
-                          <span key={act} className="text-[11px] font-mono px-2 py-1 bg-destructive/10 text-destructive rounded border border-destructive/20">{act}</span>
-                        )) : <span className="text-xs text-muted-foreground italic">Standard restrictions apply</span>}
+                      <div className="space-y-4">
+                        <span className="text-[10px] font-bold text-destructive uppercase tracking-widest block mb-1">Forbidden Actions</span>
+                        <div className="flex flex-wrap gap-2">
+                          {pgResult.intent_extraction.manifest?.forbidden_actions?.length ? pgResult.intent_extraction.manifest.forbidden_actions.map((act: string) => (
+                            <span key={act} className="text-[11px] font-mono px-2 py-1 bg-destructive/10 text-destructive rounded border border-destructive/20">{act}</span>
+                          )) : <span className="text-xs text-muted-foreground italic">Standard restrictions apply</span>}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="grid md:grid-cols-2 gap-6">
-                  {/* Agent Output */}
-                  <div className="bg-background/80 border border-border rounded-xl p-6 flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-5 flex items-center gap-2">
-                      <Cpu className="w-4 h-4" /> Agent Output
+                  {/* Unprotected Agent (Unsafe) Console */}
+                  <div className="bg-background/80 border border-border rounded-xl p-6 flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.02)] h-[400px]">
+                    <h3 className="text-xs font-bold text-warning uppercase tracking-widest mb-5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-warning" /> Unprotected Agent (Unsafe)
+                      </div>
+                      <div className={cn(
+                        "text-[9px] px-2 py-0.5 rounded-full font-bold transition-all duration-300",
+                        pgUnprotectedLinesCount === 0 ? "bg-muted text-muted-foreground" :
+                        pgUnprotectedLinesCount < (pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? 6 : 5) ? "bg-warning/20 text-warning animate-pulse" :
+                        pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? "bg-destructive/20 text-destructive border border-destructive/30 animate-bounce" : "bg-success/20 text-success border border-success/30"
+                      )}>
+                        {pgUnprotectedLinesCount === 0 ? "IDLE" :
+                         pgUnprotectedLinesCount < (pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? 6 : 5) ? "EXECUTING" :
+                         pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? "VULNERABLE" : "SAFE"}
+                      </div>
                     </h3>
-                    <div className="flex-1 font-mono text-[11px] text-muted-foreground overflow-y-auto bg-background p-4 rounded-lg border border-border/50 mb-4 whitespace-pre-wrap shadow-inner leading-relaxed">
-                      {pgResult.agent.reasoning || "No reasoning available."}
-                    </div>
-                    <div className="p-4 bg-muted/20 rounded-lg border border-border">
-                      <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase block mb-1">Attempted Action:</span>
-                      <span className="text-sm font-bold tracking-tight text-foreground break-all">
-                        {pgResult.agent.action?.action_type || 'Unknown'} → {pgResult.agent.action?.target || 'None'}
-                      </span>
+                    <div ref={pgUnprotectedScrollRef} className="flex-1 font-mono text-[11px] overflow-y-auto bg-black p-5 rounded-lg border border-border/50 space-y-3 leading-relaxed shadow-inner select-text scroll-smooth">
+                      {pgUnprotectedLinesCount >= 1 && (
+                        <p className="text-white/40 font-light animate-fade-in">[00:00] Ingesting prompt: "{pgInput.substring(0, 50)}..."</p>
+                      )}
+                      {pgUnprotectedLinesCount >= 2 && (
+                        <p className="text-white animate-fade-in">💭 Thought: {pgResult.agent.reasoning}</p>
+                      )}
+                      {pgUnprotectedLinesCount >= 3 && (
+                        <p className="text-white/40 font-light animate-fade-in">[00:02] Evaluating required tool calls...</p>
+                      )}
+                      {pgUnprotectedLinesCount >= 4 && (
+                        <p className="text-yellow-400 font-semibold animate-fade-in">[00:03] Attempting tool call: '{pgResult.agent.action?.action_type || 'Unknown'}' on target '{pgResult.agent.action?.target || 'None'}'</p>
+                      )}
+                      {pgUnprotectedLinesCount >= 5 && (
+                        pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? (
+                          <p className="text-red-500 font-bold animate-fade-in">[00:04] ⚠️ WARNING: Action executed unprotected!</p>
+                        ) : (
+                          <p className="text-success font-semibold animate-fade-in">[00:04] ✓ Safe action executed successfully.</p>
+                        )
+                      )}
+                      {pgUnprotectedLinesCount >= 6 && pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' && (
+                        <p className="text-red-500 font-bold animate-fade-in">[00:05] ❌ CRITICAL SECURITY VULNERABILITY EXPLOITED: Target out of bounds!</p>
+                      )}
                     </div>
                   </div>
 
-                  {/* ARGUS Output */}
-                  <div className="bg-background/80 border border-border rounded-xl p-6 flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-5 flex items-center gap-2">
-                      <Shield className="w-4 h-4" /> Security Evaluation
-                    </h3>
-                    <div className={`p-5 rounded-xl border flex items-center gap-4 mb-5 shadow-sm ${
-                      pgResult.policy.decision === 'QUARANTINE' ? 'bg-warning/5 border-warning/20 text-warning' :
-                      pgResult.policy.decision === 'ALLOW' ? 'bg-success/5 border-success/20 text-success' : 'bg-destructive/5 border-destructive/20 text-destructive'
-                    }`}>
-                      {pgResult.policy.decision === 'QUARANTINE' ? <AlertTriangle className="w-6 h-6 shrink-0" /> :
-                       pgResult.policy.decision === 'ALLOW' ? <CheckCircle2 className="w-6 h-6 shrink-0" /> : <XCircle className="w-6 h-6 shrink-0" />}
-                      <div>
-                        <p className="font-bold text-sm tracking-tight">{pgResult.policy.decision}</p>
-                        <p className="text-xs opacity-80 mt-1 font-medium">Risk Score: {(pgResult.policy.risk_score * 100).toFixed(0)}%</p>
+                  {/* ARGUS Protected Agent Console */}
+                  <div className="bg-background/80 border border-border rounded-xl p-6 flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.02)] h-[400px]">
+                    <h3 className="text-xs font-bold text-success uppercase tracking-widest mb-5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-success" /> ARGUS Protected Agent (Safe)
                       </div>
-                    </div>
-                    <div className="flex-1 bg-background p-4 rounded-lg border border-border/50 text-sm text-foreground overflow-y-auto shadow-inner leading-relaxed font-medium">
-                      <span className="font-bold tracking-wide uppercase text-xs text-muted-foreground block mb-2">Explanation:</span>
-                      {pgResult.explanation?.details || pgResult.explanation?.summary || pgResult.policy.reason || "No explanation provided."}
+                      <div className={cn(
+                        "text-[9px] px-2 py-0.5 rounded-full font-bold transition-all duration-300",
+                        pgProtectedLinesCount === 0 ? "bg-muted text-muted-foreground" :
+                        pgProtectedLinesCount < (pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? 8 : 7) ? "bg-primary/20 text-primary animate-pulse" :
+                        pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? "bg-success/20 text-success border border-success/30" : "bg-success/20 text-success border border-success/30"
+                      )}>
+                        {pgProtectedLinesCount === 0 ? "IDLE" :
+                         pgProtectedLinesCount < (pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? 8 : 7) ? "SHIELD ACTIVE" :
+                         pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? "SECURED (QUARANTINED)" : "SECURED (ALLOWED)"}
+                      </div>
+                    </h3>
+                    <div ref={pgProtectedScrollRef} className="flex-1 font-mono text-[11px] overflow-y-auto bg-black p-5 rounded-lg border border-border/50 space-y-3 leading-relaxed shadow-inner select-text scroll-smooth">
+                      {pgProtectedLinesCount >= 1 && (
+                        <p className="text-white/40 font-light animate-fade-in">[00:00] Ingesting prompt: "{pgInput.substring(0, 50)}..."</p>
+                      )}
+                      {pgProtectedLinesCount >= 2 && (
+                        <p className="text-white/40 font-light animate-fade-in">[00:01] ARGUS Layer 1: Analyzing user intent manifest boundaries...</p>
+                      )}
+                      {pgProtectedLinesCount >= 3 && (
+                        <p className="text-white animate-fade-in">💭 Thought: {pgResult.agent.reasoning}</p>
+                      )}
+                      {pgProtectedLinesCount >= 4 && (
+                        <p className="text-white/40 font-light animate-fade-in">[00:03] Evaluating required tool calls...</p>
+                      )}
+                      {pgProtectedLinesCount >= 5 && (
+                        <p className="text-yellow-400 font-semibold animate-fade-in">[00:04] Attempting tool call: '{pgResult.agent.action?.action_type || 'Unknown'}' on target '{pgResult.agent.action?.target || 'None'}'</p>
+                      )}
+                      {pgProtectedLinesCount >= 6 && (
+                        pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? (
+                          <p className="text-red-400 font-bold animate-fade-in">[00:05] 🛡️ [ARGUS INTERCEPTED] Security Violation Blocked!</p>
+                        ) : (
+                          <p className="text-success font-semibold animate-fade-in">[00:05] 🛡️ [ARGUS APPROVED] Target verified within intent scope.</p>
+                        )
+                      )}
+                      {pgProtectedLinesCount >= 7 && (
+                        pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? (
+                          <p className="text-red-400 animate-fade-in">   Reason: Target '{pgResult.agent.action?.target}' is not authorized by the manifest scope.</p>
+                        ) : (
+                          <p className="text-success font-bold animate-fade-in">   ✓ ACTION ALLOWED</p>
+                        )
+                      )}
+                      {pgProtectedLinesCount >= 8 && pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' && (
+                        <p className="text-red-400 font-bold animate-fade-in">⊗ ACTION QUARANTINED & TERMINATED</p>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {/* Security Evaluation Detailed Card */}
+                {pgShowDecision && (
+                  <div className="bg-background/80 border border-border rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] animate-slide-up duration-500">
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-5 flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-primary" /> Gateway Security Decision Summary
+                    </h3>
+                    <div className="grid md:grid-cols-12 gap-6 items-center">
+                      <div className="md:col-span-4">
+                        <div className={cn(
+                          "p-5 rounded-xl border flex items-center gap-4 shadow-sm",
+                          pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? 'bg-warning/5 border-warning/20 text-warning animate-pulse' :
+                          pgResult.policy.decision?.toUpperCase() === 'ALLOW' ? 'bg-success/5 border-success/20 text-success' : 'bg-destructive/5 border-destructive/20 text-destructive'
+                        )}>
+                          {pgResult.policy.decision?.toUpperCase() === 'QUARANTINE' ? <AlertTriangle className="w-6 h-6 shrink-0 text-warning animate-pulse" /> :
+                           pgResult.policy.decision?.toUpperCase() === 'ALLOW' ? <CheckCircle2 className="w-6 h-6 shrink-0 text-success" /> : <XCircle className="w-6 h-6 shrink-0 text-destructive" />}
+                          <div>
+                            <p className="font-extrabold text-sm tracking-tight">{pgResult.policy.decision}</p>
+                            <p className="text-xs opacity-85 mt-0.5 font-bold">Risk Score: {(pgResult.policy.risk_score * 100).toFixed(0)}%</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="md:col-span-8 p-4 bg-muted/20 border border-border rounded-xl leading-relaxed text-sm text-foreground">
+                        <span className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground block mb-1">Threat Explanation</span>
+                        {pgResult.explanation?.details || pgResult.explanation?.summary || pgResult.policy.reason || "No threat explanation available."}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
