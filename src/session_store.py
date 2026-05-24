@@ -25,6 +25,9 @@ async def get_redis(max_retries: int = 3) -> redis.Redis:
         if _redis_client is not None:
             return _redis_client
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        if not redis_url or redis_url.lower() in ["none", "false", "disabled", "mock", ""]:
+            logger.info("Redis is disabled or not configured; using in-memory store immediately")
+            return None
         for attempt in range(max_retries):
             try:
                 client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
