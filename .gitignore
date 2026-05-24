@@ -174,3 +174,6 @@ temp/
 
 lobster-trap
 lobstertrap/.git/
+
+test_agent.py
+test_gemini.py

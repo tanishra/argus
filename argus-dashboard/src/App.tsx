@@ -4,12 +4,14 @@ import Dashboard from './pages/Dashboard'
 import ReviewQueue from './pages/ReviewQueue'
 import CompliancePage from './pages/CompliancePage'
 import DemoPage from './pages/DemoPage'
+import Documentation from './pages/Documentation'
 import { Shield, ListChecks, FileText, PlayCircle, Menu, X, Home, AlertTriangle } from 'lucide-react'
 import { cn } from './lib/utils'
 
 const navItems = [
   { name: 'Review Queue', path: '/reviews', icon: ListChecks, label: 'Pending reviews' },
   { name: 'Compliance', path: '/compliance', icon: FileText, label: 'Audit reports' },
+  { name: 'Documentation', path: '/docs', icon: FileText, label: 'Developer manuals' },
 ]
 
 function Navbar() {
@@ -137,6 +139,7 @@ function App() {
           <Route path="/demo" element={<DemoPage />} />
           <Route path="/reviews" element={<ReviewQueue />} />
           <Route path="/compliance" element={<CompliancePage />} />
+          <Route path="/docs" element={<Documentation />} />
           <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

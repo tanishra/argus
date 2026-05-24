@@ -102,14 +102,12 @@ export default function Dashboard() {
               <Play className="w-5 h-5 fill-current" />
               Run Live Simulation
             </Link>
-            <a
-              href="https://github.com/tanishra/argus"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/docs"
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-foreground rounded-md font-medium text-base border border-border hover:bg-muted/50 transition-colors duration-300 w-full sm:w-auto shadow-premium"
             >
               View Documentation
-            </a>
+            </Link>
           </div>
         </div>
       </section>
