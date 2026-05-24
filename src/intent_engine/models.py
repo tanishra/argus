@@ -66,6 +66,9 @@ class ActionType(str, Enum):
     ACCESS_WEB = "access_web"
     DOWNLOAD_FILE = "download_file"
     UPLOAD_FILE = "upload_file"
+    FETCH_URL = "fetch_url"
+    RUN_COMMAND = "run_command"
+    CUSTOM_ACTION = "custom_action"
 
     # Administrative
     CREATE_TICKET = "create_ticket"
