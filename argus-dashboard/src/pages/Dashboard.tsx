@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, subscribeToFeed } from '../lib/api'
 import {
-  Shield, Activity, AlertTriangle, ListChecks, Users, ShieldAlert, FileText, ChevronRight, Lock, Play, Cpu, Network, User, ArrowRight, Github, Mail
+  Shield, Activity, AlertTriangle, Users, ShieldAlert, FileText, ChevronRight, Lock, Play, Cpu, Network, User, ArrowRight, Github, Mail
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Link } from 'react-router-dom'
@@ -312,37 +312,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* ── REAL-TIME METRICS ── */}
-        <section className="animate-slide-up" style={{ animationDelay: '300ms', animationFillMode: 'both' }}>
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-foreground mb-4 tracking-tight">Platform Telemetry</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Live statistics from the ARGUS engine processing agent actions.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="premium-card p-6 text-center group">
-              <Activity className="w-5 h-5 text-muted-foreground mx-auto mb-4 group-hover:text-foreground transition-colors duration-300" />
-              <div className="text-4xl font-bold text-foreground tracking-tight mb-2 font-mono">{isLoading ? '-' : stats.actionsToday}</div>
-              <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider text-xs">Actions Evaluated</div>
-            </div>
-            <div className="premium-card p-6 text-center shadow-[0_0_15px_rgba(34,197,94,0.05)] border-success/30 group">
-              <Shield className="w-5 h-5 text-success mx-auto mb-4 group-hover:scale-110 transition-transform duration-300" />
-              <div className="text-4xl font-bold text-success tracking-tight mb-2 font-mono">{isLoading ? '-' : stats.allowedActions}</div>
-              <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider text-xs">Actions Allowed</div>
-            </div>
-            <div className="premium-card p-6 text-center shadow-[0_0_15px_rgba(239,68,68,0.05)] border-destructive/30 group">
-              <AlertTriangle className="w-5 h-5 text-destructive mx-auto mb-4 group-hover:scale-110 transition-transform duration-300" />
-              <div className="text-4xl font-bold text-destructive tracking-tight mb-2 font-mono">{isLoading ? '-' : stats.blockedActions}</div>
-              <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider text-xs">Threats Blocked</div>
-            </div>
-            <div className="premium-card p-6 text-center group">
-              <ListChecks className="w-5 h-5 text-muted-foreground mx-auto mb-4 group-hover:text-foreground transition-colors duration-300" />
-              <div className="text-4xl font-bold text-foreground tracking-tight mb-2 font-mono">{isLoading ? '-' : stats.queueSize}</div>
-              <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider text-xs">Pending Reviews</div>
-            </div>
-          </div>
-        </section>
+
 
         {/* ── WHY ARGUS? & FOOTER ── */}
         <section className="animate-slide-up mt-32 mb-8" style={{ animationDelay: '400ms', animationFillMode: 'both' }}>
