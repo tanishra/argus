@@ -1,12 +1,22 @@
 [project]
 name = "argus-shield"
-version = "0.1.5"
+version = "0.1.7"
 description = "ARGUS Python SDK - Framework-agnostic AI agent guardrails and safety tool"
 readme = "README.md"
 authors = [
     { name = "Tanish Rajput", email = "tanishrajput9@gmail.com" }
 ]
 requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["ai-security", "agent-guardrails", "prompt-injection", "active-defense"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
 dependencies = [
     "httpx>=0.28.1",
     "pydantic>=2.13.4",
@@ -25,3 +35,8 @@ dev = [
     "pytest-asyncio>=1.3.0",
 ]
 
+
+[project.urls]
+Homepage = "https://argus-nine-opal.vercel.app"
+Repository = "https://github.com/tanishra/argus"
+Documentation = "https://argus-nine-opal.vercel.app/docs"

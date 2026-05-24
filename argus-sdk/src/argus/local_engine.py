@@ -139,7 +139,8 @@ class LocalEvaluationEngine:
         system_instruction = (
             "You are the ARGUS security intent extractor. Analyze the user prompt and identify "
             "what general action categories and targets are authorized by the user.\n"
-            "Action categories MUST be selected from: ['read_file', 'write_file', 'send_email', 'fetch_url', 'run_command', 'custom_action']."
+            "Action categories MUST be selected from: ['read_file', 'write_file', 'send_email', 'fetch_url', 'run_command', 'custom_action'].\n"
+            "restricted_targets MUST extract all specific files, directories, email addresses, domains, or URLs explicitly mentioned in the user prompt as allowed targets."
         )
 
         payload = {
@@ -182,6 +183,7 @@ class LocalEvaluationEngine:
             "You are the ARGUS security intent extractor. Analyze the user prompt and identify "
             "what general action categories and targets are authorized by the user.\n"
             "Action categories MUST be selected from: ['read_file', 'write_file', 'send_email', 'fetch_url', 'run_command', 'custom_action'].\n"
+            "restricted_targets MUST extract all specific files, directories, email addresses, domains, or URLs explicitly mentioned in the user prompt as allowed targets.\n"
             "Respond ONLY as a JSON object with keys 'allowed_actions' (list of strings) and 'restricted_targets' (list of strings)."
         )
 

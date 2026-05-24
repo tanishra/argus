@@ -234,7 +234,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "argus-shield"
-version = "0.1.5"
+version = "0.1.7"
 source = { editable = "argus-sdk" }
 dependencies = [
     { name = "httpx" },
