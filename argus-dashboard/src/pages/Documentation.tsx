@@ -101,7 +101,9 @@ const tocItems: Record<string, { id: string; label: string }[]> = {
   ],
   configuration: [
     { id: 'gateway-env', label: '1. Gateway Configs' },
-    { id: 'sdk-env', label: '2. SDK Variables' }
+    { id: 'sdk-env', label: '2. SDK Variables' },
+    { id: 'mode-configs', label: '3. Mode Profiles' },
+    { id: 'dashboard-modes', label: '4. Dashboard Triage' }
   ],
   vanilla: [
     { id: 'vanilla-overview', label: 'Custom Decorators' },
@@ -548,46 +550,80 @@ export ARGUS_API_KEY="my-local-gateway-password"`}
 
               <h3 id="gateway-env" className="text-2xl font-bold tracking-tight text-foreground mb-4 pt-4">1. Gateway Server Configuration (.env)</h3>
               <p className="text-base text-muted-foreground leading-relaxed mb-4 font-light">
-                These variables reside on the server hosting your ARGUS Gateway. They configure database URLs, LLM credentials, and authentication standards.
+                These variables reside on the server hosting your ARGUS Gateway. They configure database URLs, LLM credentials, CORS policies, Redis caching, and Lobster Trap reverse proxy rules.
               </p>
 
               <div className="overflow-hidden border border-border rounded-lg my-6">
-                <table className="min-w-full divide-y divide-border text-sm">
-                  <thead className="bg-muted/40">
-                    <tr>
-                      <th className="px-6 py-3 text-left font-medium text-muted-foreground">Variable</th>
-                      <th className="px-6 py-3 text-left font-medium text-muted-foreground">Default</th>
-                      <th className="px-6 py-3 text-left font-medium text-muted-foreground">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-transparent font-light text-muted-foreground">
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">GEMINI_API_KEY / OPENAI_API_KEY</td>
-                      <td className="px-6 py-4">None</td>
-                      <td className="px-6 py-4">The LLM key used by the gateway to parse intents and generate human explanations.</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_LLM_MODEL</td>
-                      <td className="px-6 py-4 font-mono">gemini/gemini-2.5-flash</td>
-                      <td className="px-6 py-4">Model used for pre-action intent extraction (Layer 1).</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_PRO_MODEL</td>
-                      <td className="px-6 py-4 font-mono">gemini/gemini-2.5-pro</td>
-                      <td className="px-6 py-4">Model used for deep violation explanation generation (Layer 3).</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">API_KEY</td>
-                      <td className="px-6 py-4 font-mono">None</td>
-                      <td className="px-6 py-4">Password used to authorize client SDK callers.</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">DEMO_MODE</td>
-                      <td className="px-6 py-4 font-mono">true</td>
-                      <td className="px-6 py-4">Set to 'true' to skip SDK API key checks for seamless local sandboxing.</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-border text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Variable</th>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Default</th>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border bg-transparent font-light text-muted-foreground">
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY</td>
+                        <td className="px-6 py-4">None</td>
+                        <td className="px-6 py-4">The LLM key used by the gateway to parse intents and generate human explanations.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_LLM_MODEL</td>
+                        <td className="px-6 py-4 font-mono">gemini/gemini-2.5-flash</td>
+                        <td className="px-6 py-4">Model used for pre-action intent extraction (Layer 1). Prepend provider to force correct routing (e.g. <code>gemini/</code>).</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_PRO_MODEL</td>
+                        <td className="px-6 py-4 font-mono">gemini/gemini-2.5-pro</td>
+                        <td className="px-6 py-4">Model used for deep violation explanation generation (Layer 3).</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">API_KEY</td>
+                        <td className="px-6 py-4 font-mono">None</td>
+                        <td className="px-6 py-4">Password used to authorize client SDK callers. Highly recommended in cloud/self-hosted setups.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">DEMO_MODE</td>
+                        <td className="px-6 py-4 font-mono">true</td>
+                        <td className="px-6 py-4">Set to 'true' to skip SDK API key checks for seamless local sandboxing and testing.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">DATABASE_URL</td>
+                        <td className="px-6 py-4 font-mono">sqlite+aiosqlite:///./argus.db</td>
+                        <td className="px-6 py-4">Database URL for SQLAlchemy persistence (SQLite, PostgreSQL, etc.). Stores audit logs, review logs, and telemetry.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">REDIS_URL</td>
+                        <td className="px-6 py-4 font-mono">None</td>
+                        <td className="px-6 py-4">
+                          Redis database connection URL. <strong>Pro-Tip:</strong> Set to <code>disabled</code> to skip all Redis connection attempts and fall back to lightning-fast in-memory storage (ideal for serverless sandboxes like Hugging Face to avoid 3-second startup delays).
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">CORS_ORIGINS</td>
+                        <td className="px-6 py-4 font-mono">http://localhost:3000, http://localhost:5173</td>
+                        <td className="px-6 py-4">Comma-separated list of browser origins permitted to cross-origin fetch the gateway API (critical to configure when dashboard and gateway are split).</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">USE_LOBSTER_TRAP_BINARY</td>
+                        <td className="px-6 py-4 font-mono">true</td>
+                        <td className="px-6 py-4">Toggles the pre-compiled Go safety binary proxy to inspect prompts and action targets in under a millisecond.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">LOBSTER_TRAP_BINARY_PATH</td>
+                        <td className="px-6 py-4 font-mono">./lobster-trap/lobstertrap</td>
+                        <td className="px-6 py-4">System path to the Go safety enforcer binary executable.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">LOBSTER_TRAP_POLICY_PATH</td>
+                        <td className="px-6 py-4 font-mono">./configs/lobstertrap_policy.yaml</td>
+                        <td className="px-6 py-4">Path to the YAML file describing first-match-wins safety rule definitions.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <h3 id="sdk-env" className="text-2xl font-bold tracking-tight text-foreground mb-4">2. Agent Client SDK Environment Variables</h3>
@@ -596,33 +632,164 @@ export ARGUS_API_KEY="my-local-gateway-password"`}
               </p>
 
               <div className="overflow-hidden border border-border rounded-lg my-6">
-                <table className="min-w-full divide-y divide-border text-sm">
-                  <thead className="bg-muted/40">
-                    <tr>
-                      <th className="px-6 py-3 text-left font-medium text-muted-foreground">Variable</th>
-                      <th className="px-6 py-3 text-left font-medium text-muted-foreground">Default</th>
-                      <th className="px-6 py-3 text-left font-medium text-muted-foreground">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-transparent font-light text-muted-foreground">
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_BASE_URL</td>
-                      <td className="px-6 py-4 font-mono">https://tanishra-argus.hf.space</td>
-                      <td className="px-6 py-4">The absolute API URL of your deployed ARGUS Gateway. Defaults to the free hosted Hugging Face Spaces cloud sandbox.</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_API_KEY</td>
-                      <td className="px-6 py-4">None</td>
-                      <td className="px-6 py-4">Secret credentials that match the gateway's <code>API_KEY</code> variable to authenticate cloud or self-hosted API calls.</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_LOCAL_MODE</td>
-                      <td className="px-6 py-4 font-mono">false</td>
-                      <td className="px-6 py-4">Set to 'true' to trigger the fully offline rule evaluation engine directly on the client machine, skipping all network requests.</td>
-                    </tr>
-                  </tbody>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-border text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Variable</th>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Default</th>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border bg-transparent font-light text-muted-foreground">
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_BASE_URL</td>
+                        <td className="px-6 py-4 font-mono">https://tanishrajput-argus.hf.space</td>
+                        <td className="px-6 py-4">The absolute API URL of your deployed ARGUS Gateway. Defaults to the free hosted Hugging Face Spaces cloud sandbox.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_API_KEY</td>
+                        <td className="px-6 py-4">None</td>
+                        <td className="px-6 py-4">Secret credentials that match the gateway's <code>API_KEY</code> variable to authenticate cloud or self-hosted API calls.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_LOCAL_MODE</td>
+                        <td className="px-6 py-4 font-mono">false</td>
+                        <td className="px-6 py-4">Set to 'true' to trigger the fully offline, zero-network rule evaluation engine directly on the client machine, skipping all network requests.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">GEMINI_API_KEY / OPENAI_API_KEY</td>
+                        <td className="px-6 py-4">None</td>
+                        <td className="px-6 py-4">Used directly inside the client process in Mode B to run embedded LLM-backed intent extraction and semantic audits without a network gateway.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-                </table>
+              <h3 id="mode-configs" className="text-2xl font-bold tracking-tight text-foreground mb-4 mt-8">3. Configuration Profiles by Mode</h3>
+              <p className="text-base text-muted-foreground leading-relaxed mb-4 font-light">
+                Here are the exact environment variables required for both your **Agent Client Shell** and the **Gateway Server** under each setup profile:
+              </p>
+
+              <div className="space-y-6 my-6">
+                <div className="border border-border bg-muted/20 p-5 rounded-lg">
+                  <h4 className="font-bold text-emerald-500 text-sm tracking-wider uppercase mb-3 flex items-center gap-2">
+                    <Globe className="w-4 h-4" /> Mode A: Hugging Face Cloud (Free Sandbox)
+                  </h4>
+                  <p className="text-sm text-muted-foreground font-light leading-relaxed mb-4">
+                    Uses the free, shared public cloud gateway hosted on Hugging Face. The SDK automatically sends intent extractions and action audits to the cloud sandbox.
+                  </p>
+                  <strong className="text-xs text-foreground font-mono block mb-1">Agent Project .env Configuration:</strong>
+                  <CodeBlock 
+                    id="env-profile-a" 
+                    language="bash" 
+                    code={`# Point to the public Hugging Face space endpoint
+ARGUS_BASE_URL=https://tanishrajput-argus.hf.space
+ARGUS_API_KEY=argus-public-free
+ARGUS_LOCAL_MODE=false`} 
+                  />
+                  <strong className="text-xs text-foreground font-mono block mb-1 mt-4">Local Dashboard .env.local Configuration (Optional):</strong>
+                  <p className="text-sm text-muted-foreground font-light leading-relaxed mb-2">
+                    If you want to view telemetry and human reviews locally on your developer machine while routing agent evaluations to the cloud, point your local Vite dashboard to the Hugging Face Space backend:
+                  </p>
+                  <CodeBlock 
+                    id="env-profile-a-dashboard" 
+                    language="bash" 
+                    code={`VITE_API_URL=https://tanishrajput-argus.hf.space`} 
+                  />
+                </div>
+
+                <div className="border border-border bg-muted/20 p-5 rounded-lg">
+                  <h4 className="font-bold text-sky-500 text-sm tracking-wider uppercase mb-3 flex items-center gap-2">
+                    <Sliders className="w-4 h-4" /> Mode B: Fully Offline Library Mode (Embedded)
+                  </h4>
+                  <p className="text-sm text-muted-foreground font-light leading-relaxed mb-4">
+                    Zero network dependency. Evaluations are computed locally in-process. Runs rule-based fallback heuristics automatically, or queries your local developer keys for LLM intent matching.
+                  </p>
+                  <strong className="text-xs text-foreground font-mono block mb-1">Agent Project .env Configuration:</strong>
+                  <CodeBlock 
+                    id="env-profile-b" 
+                    language="bash" 
+                    code={`# Enable offline evaluation
+ARGUS_LOCAL_MODE=true
+# (Optional) Provide local LLM key to run embedded Gemini intent matching
+GEMINI_API_KEY=AIzaSy...`} 
+                  />
+                  <AlertBlock type="tip" title="No Dashboard Telemetry in Offline Mode">
+                    Because Mode B operates 100% locally in-process inside your agent runtime without sending any network packets, <strong>no centralized visual dashboard is supported in this mode</strong>. This ensures absolute data privacy and zero-latency execution, making it perfect for air-gapped runtimes, local testing environments, and offline developer workflows.
+                  </AlertBlock>
+                </div>
+
+                <div className="border border-border bg-muted/20 p-5 rounded-lg">
+                  <h4 className="font-bold text-amber-500 text-sm tracking-wider uppercase mb-3 flex items-center gap-2">
+                    <Settings className="w-4 h-4" /> Mode C: Self-Hosted Mode (Docker Stack)
+                  </h4>
+                  <p className="text-sm text-muted-foreground font-light leading-relaxed mb-4">
+                    Runs the full gateway, SQLite, and administration dashboard privately inside your own Docker container environment.
+                  </p>
+                  <strong className="text-xs text-foreground font-mono block mb-1">Agent Project .env Configuration:</strong>
+                  <CodeBlock 
+                    id="env-profile-c" 
+                    language="bash" 
+                    code={`# Point to your local docker container instance
+ARGUS_BASE_URL=http://localhost:8000
+ARGUS_API_KEY=my-local-gateway-password
+ARGUS_LOCAL_MODE=false`} 
+                  />
+                  <strong className="text-xs text-foreground font-mono block mb-1 mt-4">Docker Gateway .env Server Configuration:</strong>
+                  <CodeBlock 
+                    id="env-profile-c-server" 
+                    language="bash" 
+                    code={`# API password to authorize client SDK calls
+API_KEY=my-local-gateway-password
+# Gemini API Key used by the gateway container for extraction
+GEMINI_API_KEY=AIzaSy...
+# Disable Redis connectivity to bypass startup delays (optional)
+REDIS_URL=disabled`} 
+                  />
+                </div>
+              </div>
+
+              <div className="h-px bg-border my-8" />
+
+              <h3 id="dashboard-modes" className="text-2xl font-bold tracking-tight text-foreground mb-4">4. Dashboard Triage & Administration</h3>
+              <p className="text-base text-muted-foreground leading-relaxed mb-6 font-light">
+                The **ARGUS Administration Portal** is the central visual interface for real-time telemetry, audit logging, and manual human-in-the-loop overrides. Here is how developers access and interact with the dashboard under different profiles:
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                <div className="border border-border bg-muted/10 p-5 rounded-lg">
+                  <h4 className="font-bold text-foreground text-sm tracking-tight mb-2">How to Access the Dashboard</h4>
+                  <ul className="space-y-3 text-xs text-muted-foreground font-light leading-relaxed list-disc pl-4">
+                    <li>
+                      <strong className="text-foreground">Cloud Mode (A):</strong> You can view all logs, real-time sessions, and review items directly on the cloud-hosted console at <strong><code>https://tanishrajput-argus.hf.space</code></strong>. To run a local dashboard pointing to the cloud gateway, run:
+                      <CodeBlock id="start-dev-dashboard" language="bash" code={`cd argus-dashboard\npnpm install\nVITE_API_URL=https://tanishrajput-argus.hf.space pnpm dev`} />
+                      Open <strong><code>http://localhost:5173</code></strong> in your browser.
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Offline Mode (B):</strong> The dashboard is disabled because no gateway server exists to aggregate telemetry. If visual audit trails or manual human reviews are required, you must run the gateway backend locally using Mode C, or configure Mode A.
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Self-Hosted Mode (C):</strong> Spin up your Docker compose stack. The React app is automatically compiled and hosted on <strong><code>http://localhost:3000</code></strong>.
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="border border-border bg-muted/10 p-5 rounded-lg">
+                  <h4 className="font-bold text-foreground text-sm tracking-tight mb-2">Triage & Overrides (Human-in-the-Loop)</h4>
+                  <ul className="space-y-3 text-xs text-muted-foreground font-light leading-relaxed list-disc pl-4">
+                    <li>
+                      <strong className="text-foreground">Real-Time Metrics:</strong> The homepage shows total actions evaluated, allowed, quarantined, active sessions, and engine latencies.
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Review Queue Escalations:</strong> When an agent attempts an unauthorized action (e.g. writing `pass.txt` instead of the authorized `index.html`), it raises an <code>ArgusQuarantineException</code> and enters the Review Queue.
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Interactive Overrides:</strong> Administrators can read the AI's mismatch explanation, detailed reasoning, and recommended action. They can click **APPROVE** to override and authorize the request, or **DENY** to lock out the execution permanently.
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               <PaginationFooter />
