@@ -669,7 +669,7 @@ export ARGUS_API_KEY="my-local-gateway-password"`}
 
               <h3 id="mode-configs" className="text-2xl font-bold tracking-tight text-foreground mb-4 mt-8">3. Configuration Profiles by Mode</h3>
               <p className="text-base text-muted-foreground leading-relaxed mb-4 font-light">
-                Here are the exact environment variables required for both your **Agent Client Shell** and the **Gateway Server** under each setup profile:
+                Here are the exact environment variables required for both your <strong>Agent Client Shell</strong> and the <strong>Gateway Server</strong> under each setup profile:
               </p>
 
               <div className="space-y-6 my-6">
@@ -755,7 +755,7 @@ REDIS_URL=disabled`}
 
               <h3 id="dashboard-modes" className="text-2xl font-bold tracking-tight text-foreground mb-4">4. Dashboard Triage & Administration</h3>
               <p className="text-base text-muted-foreground leading-relaxed mb-6 font-light">
-                The **ARGUS Administration Portal** is the central visual interface for real-time telemetry, audit logging, and manual human-in-the-loop overrides. Here is how developers access and interact with the dashboard under different profiles:
+                The <strong>ARGUS Administration Portal</strong> is the central visual interface for real-time telemetry, audit logging, and manual human-in-the-loop overrides. Here is how developers access and interact with the dashboard under different profiles:
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
@@ -786,7 +786,7 @@ REDIS_URL=disabled`}
                       <strong className="text-foreground">Review Queue Escalations:</strong> When an agent attempts an unauthorized action (e.g. writing `pass.txt` instead of the authorized `index.html`), it raises an <code>ArgusQuarantineException</code> and enters the Review Queue.
                     </li>
                     <li>
-                      <strong className="text-foreground">Interactive Overrides:</strong> Administrators can read the AI's mismatch explanation, detailed reasoning, and recommended action. They can click **APPROVE** to override and authorize the request, or **DENY** to lock out the execution permanently.
+                      <strong className="text-foreground">Interactive Overrides:</strong> Administrators can read the AI's mismatch explanation, detailed reasoning, and recommended action. They can click <strong>APPROVE</strong> to override and authorize the request, or <strong>DENY</strong> to lock out the execution permanently.
                     </li>
                   </ul>
                 </div>
@@ -1177,7 +1177,7 @@ with argus.Session("Analyze log file and output report.txt"):
                   <span className="absolute -left-[31px] top-1 bg-emerald-500 border border-border w-4 h-4 rounded-full" />
                   <h4 className="font-semibold text-foreground mb-1">4. Human Review Triage</h4>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    The action enters the **Dashboard Review Queue**. Administrators can manually inspect the arguments and override the block by marking it as <code>APPROVED</code>, letting the next loop execute.
+                    The action enters the <strong>Dashboard Review Queue</strong>. Administrators can manually inspect the arguments and override the block by marking it as <code>APPROVED</code>, letting the next loop execute.
                   </p>
                 </div>
               </div>
