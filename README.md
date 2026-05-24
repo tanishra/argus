@@ -143,6 +143,8 @@ curl -X POST http://localhost:8000/api/action/evaluate \
   "reason": "Intent mismatch: forward_email not in allowed list",
   "review_item_id": "rev_abc123"
 }
+```
+
 ## Empirical Validation & Scale Testing
 
 ARGUS is verified both semantically and empirically using rigorous local and remote testing methodologies:
