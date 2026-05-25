@@ -1,5 +1,7 @@
 import os
 import contextvars
+import json
+import re
 from typing import Optional, Dict, Any
 from .client import ArgusClient, AsyncArgusClient
 
@@ -68,6 +70,83 @@ class AsyncLocalClientWrapper:
         pass
 
 
+def _parse_scope_to_targets(scope) -> list:
+    import json
+    import os
+    import re
+
+    if not scope:
+        return []
+
+    # If it is already a dict or list
+    if isinstance(scope, dict):
+        targets = []
+        for val in scope.values():
+            targets.extend(_parse_scope_to_targets(val))
+        return targets
+
+    if isinstance(scope, list):
+        targets = []
+        for val in scope:
+            targets.extend(_parse_scope_to_targets(val))
+        return targets
+
+    # It must be a string
+    scope_str = str(scope).strip()
+    if not scope_str:
+        return []
+
+    # 1. Try JSON parsing
+    try:
+        parsed = json.loads(scope_str)
+        if isinstance(parsed, (dict, list)):
+            return _parse_scope_to_targets(parsed)
+    except Exception:
+        pass
+
+    # 2. Key-value and word extraction
+    targets = []
+    # Split by comma or semicolon
+    raw_parts = re.split(r'[,;]', scope_str)
+    for part in raw_parts:
+        part = part.strip()
+        if not part:
+            continue
+        if ':' in part or '=' in part:
+            subparts = re.split(r'[:=]', part, maxsplit=1)
+            val = subparts[1].strip().strip("'\"")
+            if val:
+                targets.append(val.lower())
+        else:
+            part_cleaned = part.strip("'\"")
+            if part_cleaned:
+                targets.append(part_cleaned.lower())
+
+    # Add the entire original scope string (lowercased, stripped of quotes)
+    cleaned_original = scope_str.strip("'\"").lower()
+    if cleaned_original not in targets:
+        targets.append(cleaned_original)
+
+    # 3. Extract words that look like filenames (contain dots)
+    for word in re.split(r'[\s\'",;=:]', scope_str):
+        word = word.strip()
+        if '.' in word and not word.startswith('.') and not word.endswith('.'):
+            cleaned_word = os.path.basename(word).lower()
+            if cleaned_word not in targets:
+                targets.append(cleaned_word)
+
+    # De-duplicate
+    seen = set()
+    unique_targets = []
+    for t in targets:
+        t_clean = t.strip().lower()
+        if t_clean and t_clean not in seen:
+            seen.add(t_clean)
+            unique_targets.append(t_clean)
+
+    return unique_targets
+
+
 class Session:
     def __init__(
         self,
@@ -81,6 +160,7 @@ class Session:
         self.session_id: Optional[str] = None
         self.manifest: Optional[Dict[str, Any]] = None
         self._token = None
+        self.quarantined = False
 
         # Check local mode: explicit parameter or ARGUS_LOCAL_MODE env var
         self.local_mode = local_mode if local_mode is not None else (
@@ -93,6 +173,40 @@ class Session:
             self.client = LocalClientWrapper(self.local_engine, self)
         else:
             self.client = client or ArgusClient()
+
+    def local_preflight_check(self, action_type: str, target: str, target_type: str = "api") -> Optional[Dict[str, Any]]:
+        import os
+        if not self.manifest:
+            return None
+            
+        scope = self.manifest.get("scope")
+        allowed_actions = self.manifest.get("allowed_actions", [])
+        
+        if action_type not in allowed_actions:
+            return {
+                "decision": "QUARANTINE",
+                "reason": f"Local Preflight Block: Action '{action_type}' not authorized in allowed actions {allowed_actions}."
+            }
+            
+        if scope:
+            allowed_files = _parse_scope_to_targets(scope)
+            target_normalized = os.path.basename(target).lower()
+            is_traversal = ".." in target or "/" in target or "\\" in target
+            
+            matches_scope = False
+            for allowed in allowed_files:
+                if target_normalized == allowed:
+                    if not is_traversal:
+                        matches_scope = True
+                        break
+                        
+            if not matches_scope:
+                return {
+                    "decision": "QUARANTINE",
+                    "reason": f"Local Preflight Block: Target '{target}' falls outside the allowed session manifest scope."
+                }
+                
+        return None
 
     def __enter__(self):
         response = self.client.extract_intent(self.user_prompt, self.user_id)
@@ -120,6 +234,7 @@ class AsyncSession:
         self.session_id: Optional[str] = None
         self.manifest: Optional[Dict[str, Any]] = None
         self._token = None
+        self.quarantined = False
 
         # Check local mode: explicit parameter or ARGUS_LOCAL_MODE env var
         self.local_mode = local_mode if local_mode is not None else (
@@ -132,6 +247,40 @@ class AsyncSession:
             self.client = AsyncLocalClientWrapper(self.local_engine, self)
         else:
             self.client = client or AsyncArgusClient()
+
+    def local_preflight_check(self, action_type: str, target: str, target_type: str = "api") -> Optional[Dict[str, Any]]:
+        import os
+        if not self.manifest:
+            return None
+            
+        scope = self.manifest.get("scope")
+        allowed_actions = self.manifest.get("allowed_actions", [])
+        
+        if action_type not in allowed_actions:
+            return {
+                "decision": "QUARANTINE",
+                "reason": f"Local Preflight Block: Action '{action_type}' not authorized in allowed actions {allowed_actions}."
+            }
+            
+        if scope:
+            allowed_files = _parse_scope_to_targets(scope)
+            target_normalized = os.path.basename(target).lower()
+            is_traversal = ".." in target or "/" in target or "\\" in target
+            
+            matches_scope = False
+            for allowed in allowed_files:
+                if target_normalized == allowed:
+                    if not is_traversal:
+                        matches_scope = True
+                        break
+                        
+            if not matches_scope:
+                return {
+                    "decision": "QUARANTINE",
+                    "reason": f"Local Preflight Block: Target '{target}' falls outside the allowed session manifest scope."
+                }
+                
+        return None
 
     async def __aenter__(self):
         response = await self.client.extract_intent(self.user_prompt, self.user_id)

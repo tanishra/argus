@@ -1,5 +1,6 @@
 import functools
 import inspect
+import json
 from typing import Any, Callable, Dict, Optional, TypeVar, cast
 
 from .exceptions import ArgusException, ArgusQuarantineException
@@ -47,6 +48,47 @@ def protect(
                 # Fallback to first parameter
                 target_val = str(next(iter(params.values())))
 
+            # Dynamic JSON string and list parsing check (common in ReAct/structured agents passing stringified inputs)
+            target_keys = ["filename", "file_name", "file", "path", "target", "destination", "url", "to", "recipient"]
+            for _ in range(3):
+                cleaned_target = target_val.strip()
+                if cleaned_target.startswith("[") and cleaned_target.endswith("]"):
+                    try:
+                        parsed_list = json.loads(cleaned_target)
+                        if isinstance(parsed_list, list) and len(parsed_list) > 0:
+                            target_val = str(parsed_list[0])
+                            continue
+                    except Exception:
+                        pass
+                    inner = cleaned_target[1:-1].strip().strip("'\"")
+                    if inner:
+                        target_val = inner
+                        continue
+                if cleaned_target.startswith("{") and cleaned_target.endswith("}"):
+                    try:
+                        parsed = json.loads(cleaned_target)
+                        found_subkey = False
+                        for tk in target_keys:
+                            if tk in parsed:
+                                target_val = str(parsed[tk])
+                                found_subkey = True
+                                break
+                        if found_subkey:
+                            continue
+                    except Exception:
+                        pass
+                break
+
+            # Zero-latency Local Preflight Check (Defense in Depth)
+            preflight_resp = session.local_preflight_check(action_type, target_val, target_type)
+            if preflight_resp:
+                session.quarantined = True
+                raise ArgusQuarantineException(
+                    message=f"Action '{action_type}' was blocked by ARGUS.",
+                    explanation=preflight_resp.get("reason"),
+                    raw_response=preflight_resp
+                )
+
             # Evaluate against ARGUS
             eval_resp = session.client.evaluate_action(
                 session_id=session.session_id,
@@ -58,6 +100,7 @@ def protect(
 
             decision = str(eval_resp.get("decision", "QUARANTINE")).upper()
             if decision in ["QUARANTINE", "DENY"]:
+                session.quarantined = True
                 raise ArgusQuarantineException(
                     message=f"Action '{action_type}' was blocked by ARGUS.",
                     explanation=eval_resp.get("reason", "No reason provided."),
@@ -85,6 +128,47 @@ def protect(
             elif params:
                 target_val = str(next(iter(params.values())))
 
+            # Dynamic JSON string and list parsing check (common in ReAct/structured agents passing stringified inputs)
+            target_keys = ["filename", "file_name", "file", "path", "target", "destination", "url", "to", "recipient"]
+            for _ in range(3):
+                cleaned_target = target_val.strip()
+                if cleaned_target.startswith("[") and cleaned_target.endswith("]"):
+                    try:
+                        parsed_list = json.loads(cleaned_target)
+                        if isinstance(parsed_list, list) and len(parsed_list) > 0:
+                            target_val = str(parsed_list[0])
+                            continue
+                    except Exception:
+                        pass
+                    inner = cleaned_target[1:-1].strip().strip("'\"")
+                    if inner:
+                        target_val = inner
+                        continue
+                if cleaned_target.startswith("{") and cleaned_target.endswith("}"):
+                    try:
+                        parsed = json.loads(cleaned_target)
+                        found_subkey = False
+                        for tk in target_keys:
+                            if tk in parsed:
+                                target_val = str(parsed[tk])
+                                found_subkey = True
+                                break
+                        if found_subkey:
+                            continue
+                    except Exception:
+                        pass
+                break
+
+            # Zero-latency Local Preflight Check (Defense in Depth)
+            preflight_resp = session.local_preflight_check(action_type, target_val, target_type)
+            if preflight_resp:
+                session.quarantined = True
+                raise ArgusQuarantineException(
+                    message=f"Action '{action_type}' was blocked by ARGUS.",
+                    explanation=preflight_resp.get("reason"),
+                    raw_response=preflight_resp
+                )
+
             eval_resp = await session.client.evaluate_action(
                 session_id=session.session_id,
                 action_type=action_type,
@@ -95,6 +179,7 @@ def protect(
 
             decision = str(eval_resp.get("decision", "QUARANTINE")).upper()
             if decision in ["QUARANTINE", "DENY"]:
+                session.quarantined = True
                 raise ArgusQuarantineException(
                     message=f"Action '{action_type}' was blocked by ARGUS.",
                     explanation=eval_resp.get("reason", "No reason provided."),
