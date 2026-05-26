@@ -12,7 +12,8 @@ from ..exceptions import ArgusException, ArgusQuarantineException
 from ..session import get_current_session
 
 
-def _extract_target_and_params(sig, args, kwargs, target_type) -> tuple[str, dict]:
+def _extract_target_and_params(sig, args, kwargs, target_type) -> tuple[str, dict, tuple, dict]:
+    bound = None
     try:
         bound = sig.bind(*args, **kwargs)
         bound.apply_defaults()
@@ -43,9 +44,11 @@ def _extract_target_and_params(sig, args, kwargs, target_type) -> tuple[str, dic
         # Fallback to the first parameter (excluding self/cls)
         non_self_params = {k: v for k, v in params.items() if k not in ["self", "cls"]}
         if non_self_params:
-            target_val = str(next(iter(non_self_params.values())))
+            found_key = next(iter(non_self_params.keys()))
+            target_val = str(params[found_key])
         else:
-            target_val = str(next(iter(params.values())))
+            found_key = next(iter(params.keys()))
+            target_val = str(params[found_key])
 
     # Dynamic JSON string and list parsing check (common in ReAct/structured agents passing stringified inputs)
     for _ in range(3):
@@ -77,9 +80,32 @@ def _extract_target_and_params(sig, args, kwargs, target_type) -> tuple[str, dic
                         break
                 if found_subkey:
                     continue
+                # Traverse nested single-key dictionary wrappers
+                if isinstance(parsed, dict) and len(parsed) == 1:
+                    val = next(iter(parsed.values()))
+                    if isinstance(val, (dict, list)):
+                        target_val = json.dumps(val)
+                        continue
+                    else:
+                        target_val = str(val)
+                        continue
             except Exception:
                 pass
         break
+
+    # Write unpacked target back into signature/arguments if possible
+    updated_args = args
+    updated_kwargs = kwargs
+    if bound:
+        if found_key:
+            bound.arguments[found_key] = target_val
+        updated_args = bound.args
+        updated_kwargs = bound.kwargs
+    else:
+        if found_key and found_key in kwargs:
+            kwargs[found_key] = target_val
+        elif len(args) > 0:
+            updated_args = (target_val,) + args[1:]
 
     # Sanitize params for API JSON serialization
     sanitized_params = {}
@@ -92,7 +118,7 @@ def _extract_target_and_params(sig, args, kwargs, target_type) -> tuple[str, dic
         except (TypeError, OverflowError):
             sanitized_params[k] = str(v)
 
-    return target_val, sanitized_params
+    return target_val, sanitized_params, updated_args, updated_kwargs
 
 
 def wrap_crewai_tool(tool: Any, action_type: str, target_type: str = "api") -> Any:
@@ -127,7 +153,7 @@ def wrap_crewai_tool(tool: Any, action_type: str, target_type: str = "api") -> A
                 "No active ARGUS session. Use `with argus.Session(prompt):` before running the agent."
             )
 
-        target_val, params = _extract_target_and_params(sig, args, kwargs, target_type)
+        target_val, params, u_args, u_kwargs = _extract_target_and_params(sig, args, kwargs, target_type)
 
         # Zero-latency Local Preflight Check (Defense in Depth)
         preflight_resp = session.local_preflight_check(action_type, target_val, target_type)
@@ -156,7 +182,7 @@ def wrap_crewai_tool(tool: Any, action_type: str, target_type: str = "api") -> A
                 raw_response=eval_resp,
             )
 
-        return original_run(*args, **kwargs)
+        return original_run(*u_args, **u_kwargs)
 
     tool._run = argus_run
 
@@ -166,5 +192,3 @@ def wrap_crewai_tool(tool: Any, action_type: str, target_type: str = "api") -> A
         tool.func = protect(action_type=action_type, target_type=target_type)(tool.func)
 
     return tool
-
-

@@ -217,12 +217,26 @@ class Session:
             return None
             
         scope = self.manifest.get("scope")
+        allowed_categories = self.manifest.get("allowed_categories", [])
         allowed_actions = self.manifest.get("allowed_actions", [])
         
-        if action_type not in allowed_actions:
+        # Taxonomy resolution
+        from .local_engine import ACTION_TYPE_TO_CATEGORY
+        action_category = ACTION_TYPE_TO_CATEGORY.get(action_type)
+        
+        authorized = False
+        if action_category is not None:
+            if action_category in allowed_categories:
+                authorized = True
+            elif action_type in allowed_actions:
+                authorized = True
+        elif action_type in allowed_actions:
+            authorized = True
+            
+        if not authorized:
             return {
                 "decision": "QUARANTINE",
-                "reason": f"Local Preflight Block: Action '{action_type}' not authorized in allowed actions {allowed_actions}."
+                "reason": f"Local Preflight Block: Action '{action_type}' (category: {action_category}) not authorized in allowed categories {allowed_categories}."
             }
             
         if scope:
@@ -293,12 +307,26 @@ class AsyncSession:
             return None
             
         scope = self.manifest.get("scope")
+        allowed_categories = self.manifest.get("allowed_categories", [])
         allowed_actions = self.manifest.get("allowed_actions", [])
         
-        if action_type not in allowed_actions:
+        # Taxonomy resolution
+        from .local_engine import ACTION_TYPE_TO_CATEGORY
+        action_category = ACTION_TYPE_TO_CATEGORY.get(action_type)
+        
+        authorized = False
+        if action_category is not None:
+            if action_category in allowed_categories:
+                authorized = True
+            elif action_type in allowed_actions:
+                authorized = True
+        elif action_type in allowed_actions:
+            authorized = True
+            
+        if not authorized:
             return {
                 "decision": "QUARANTINE",
-                "reason": f"Local Preflight Block: Action '{action_type}' not authorized in allowed actions {allowed_actions}."
+                "reason": f"Local Preflight Block: Action '{action_type}' (category: {action_category}) not authorized in allowed categories {allowed_categories}."
             }
             
         if scope:

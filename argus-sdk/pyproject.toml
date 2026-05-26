@@ -1,6 +1,6 @@
 [project]
 name = "argus-shield"
-version = "0.2.0"
+version = "0.2.1"
 description = "ARGUS Python SDK - Framework-agnostic AI agent guardrails and safety tool"
 readme = "README.md"
 authors = [

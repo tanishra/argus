@@ -39,10 +39,45 @@ def _unpack_json_target(target_val: str) -> str:
                         break
                 if found_subkey:
                     continue
+                # Traverse nested single-key dictionary wrappers
+                if isinstance(parsed, dict) and len(parsed) == 1:
+                    val = next(iter(parsed.values()))
+                    if isinstance(val, (dict, list)):
+                        target_val = json.dumps(val)
+                        continue
+                    else:
+                        target_val = str(val)
+                        continue
             except json.JSONDecodeError as e:
                 logger.debug("Failed to decode target JSON object: %s", e)
         break
     return target_val
+
+
+def _validate_target_type(action_type: str, target_type: str):
+    """
+    Logs a developer warning if the configured target_type does not match 
+    the expected format for the resolved taxonomy category.
+    """
+    try:
+        from .local_engine import ACTION_TYPE_TO_CATEGORY
+        category = ACTION_TYPE_TO_CATEGORY.get(action_type)
+        if category:
+            expected_map = {
+                "file_read": ["file"],
+                "file_write": ["file"],
+                "email": ["email"],
+                "network": ["api", "url"],
+                "execution": ["shell"]
+            }
+            expected = expected_map.get(category, [])
+            if expected and target_type.lower() not in expected:
+                logger.warning(
+                    "Decorator Warning: Action type '%s' (category '%s') expects target_type '%s', but '%s' was provided.",
+                    action_type, category, " or ".join(expected), target_type
+                )
+    except Exception:
+        pass
 
 
 def protect(
@@ -59,14 +94,12 @@ def protect(
 
     def decorator(func: F) -> F:
         sig = inspect.signature(func)
+        _validate_target_type(action_type, target_type)
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
             session = get_current_session()
             if not session:
-                # If there's no active session, we run unprotected, or we could fail closed.
-                # For safety, failing closed is better for a security product, but for beta,
-                # we'll raise an explicit exception requiring a session.
                 raise ArgusException(
                     "No active ARGUS session. Use `with argus.Session(prompt):` before calling protected tools."
                 )
@@ -77,15 +110,35 @@ def protect(
             params = dict(bound_args.arguments)
 
             # Determine target
+            target_key = None
             target_val = "unknown"
             if target_arg and target_arg in params:
+                target_key = target_arg
                 target_val = str(params[target_arg])
             elif params:
                 # Fallback to first parameter
-                target_val = str(next(iter(params.values())))
+                target_key = next(iter(params.keys()))
+                target_val = str(params[target_key])
 
             # Consolidate target unpacking logic to avoid tech debt
             target_val = _unpack_json_target(target_val)
+
+            # Write unpacked target back into function arguments
+            # so the tool receives the real filename/target, not a JSON string
+            if target_key:
+                if target_key in kwargs:
+                    kwargs[target_key] = target_val
+                elif target_key in params:
+                    bound_args.arguments[target_key] = target_val
+                    new_args = []
+                    sig_params = list(sig.parameters.keys())
+                    for i, name in enumerate(sig_params):
+                        if name in bound_args.arguments:
+                            if i < len(args):
+                                new_args.append(bound_args.arguments[name])
+                            else:
+                                kwargs[name] = bound_args.arguments[name]
+                    args = tuple(new_args)
 
             # Zero-latency Local Preflight Check (Defense in Depth)
             preflight_resp = session.local_preflight_check(action_type, target_val, target_type)
@@ -105,6 +158,34 @@ def protect(
                 target_type=target_type,
                 parameters=params,
             )
+
+            # Polymorphic Coroutine Resolver for Mixed Sync/Async Session environments
+            if inspect.iscoroutine(eval_resp):
+                import asyncio
+                try:
+                    eval_resp = asyncio.run(eval_resp)
+                except RuntimeError:
+                    # Event loop is already running in this thread
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            from concurrent.futures import ThreadPoolExecutor
+                            with ThreadPoolExecutor() as executor:
+                                eval_resp = executor.submit(asyncio.run, eval_resp).result()
+                        else:
+                            eval_resp = loop.run_until_complete(eval_resp)
+                    except Exception as e:
+                        logger.warning("Event loop coroutine resolution failed, falling back to local preflight: %s", e)
+                        if hasattr(session, "local_engine") and session.local_engine:
+                            eval_resp = session.local_engine.evaluate_action(
+                                session.manifest or {},
+                                action_type,
+                                target_val,
+                                target_type,
+                                params
+                            )
+                        else:
+                            raise
 
             decision = str(eval_resp.get("decision", "QUARANTINE")).upper()
             if decision in ["QUARANTINE", "DENY"]:
@@ -130,14 +211,36 @@ def protect(
             bound_args.apply_defaults()
             params = dict(bound_args.arguments)
 
+            # Determine target
+            target_key = None
             target_val = "unknown"
             if target_arg and target_arg in params:
+                target_key = target_arg
                 target_val = str(params[target_arg])
             elif params:
-                target_val = str(next(iter(params.values())))
+                # Fallback to first parameter
+                target_key = next(iter(params.keys()))
+                target_val = str(params[target_key])
 
             # Consolidate target unpacking logic to avoid tech debt
             target_val = _unpack_json_target(target_val)
+
+            # Write unpacked target back into function arguments
+            # so the tool receives the real filename/target, not a JSON string
+            if target_key:
+                if target_key in kwargs:
+                    kwargs[target_key] = target_val
+                elif target_key in params:
+                    bound_args.arguments[target_key] = target_val
+                    new_args = []
+                    sig_params = list(sig.parameters.keys())
+                    for i, name in enumerate(sig_params):
+                        if name in bound_args.arguments:
+                            if i < len(args):
+                                new_args.append(bound_args.arguments[name])
+                            else:
+                                kwargs[name] = bound_args.arguments[name]
+                    args = tuple(new_args)
 
             # Zero-latency Local Preflight Check (Defense in Depth)
             preflight_resp = session.local_preflight_check(action_type, target_val, target_type)
@@ -149,13 +252,17 @@ def protect(
                     raw_response=preflight_resp
                 )
 
-            eval_resp = await session.client.evaluate_action(
+            eval_resp = session.client.evaluate_action(
                 session_id=session.session_id,
                 action_type=action_type,
                 target=target_val,
                 target_type=target_type,
                 parameters=params,
             )
+
+            # Polymorphic Coroutine Resolver for Mixed Sync/Async Session environments
+            if inspect.iscoroutine(eval_resp):
+                eval_resp = await eval_resp
 
             decision = str(eval_resp.get("decision", "QUARANTINE")).upper()
             if decision in ["QUARANTINE", "DENY"]:

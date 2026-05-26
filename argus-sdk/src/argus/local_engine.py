@@ -11,6 +11,44 @@ from .exceptions import ArgusException
 logger = logging.getLogger("argus.local_engine")
 
 
+# ─────────────────────────────────────────────
+# ACTION TYPE TAXONOMY
+# Maps every action type to its capability category.
+# This is the SINGLE source of truth for authorization.
+# Adding a new action type = one line in the list below.
+# ─────────────────────────────────────────────
+ACTION_TAXONOMY = {
+    "file_read": [
+        "read_file", "open_file", "view_file", "display_file",
+        "cat_file", "list_dir", "get_file_info", "read",
+    ],
+    "file_write": [
+        "write_file", "create_file", "save_file", "update_file",
+        "append_file", "delete_file", "remove_file", "rename_file",
+        "copy_file", "move_file", "upload_file", "write",
+    ],
+    "email": [
+        "send_email", "email", "mail", "notify_user",
+        "send_notification", "message",
+    ],
+    "network": [
+        "fetch_url", "make_api_call", "http_request", "web_fetch",
+        "download", "upload", "scrape", "call_api", "invoke_api",
+        "api_request",
+    ],
+    "execution": [
+        "run_command", "execute_code", "run_script", "execute_script",
+        "bash", "shell", "python", "node", "run_shell",
+    ],
+}
+
+# Auto-generated reverse lookup: action_type → category
+ACTION_TYPE_TO_CATEGORY = {}
+for _cat, _types in ACTION_TAXONOMY.items():
+    for _t in _types:
+        ACTION_TYPE_TO_CATEGORY[_t] = _cat
+
+
 class LocalEvaluationEngine:
     """
     Fully offline/embedded evaluation engine for ARGUS.
@@ -51,7 +89,7 @@ class LocalEvaluationEngine:
         # 2. Heuristic rule extraction (fully offline, zero cost)
         return {
             "session_id": session_id,
-            "manifest": self._extract_heuristics(user_prompt)
+            "manifest": self._extract_taxonomy(user_prompt)
         }
 
     def evaluate_action(
@@ -65,33 +103,49 @@ class LocalEvaluationEngine:
         """
         Evaluates action locally using manifest boundaries.
         """
+        allowed_categories = manifest.get("allowed_categories", [])
         allowed_actions = manifest.get("allowed_actions", [])
         restricted_targets = manifest.get("restricted_targets", [])
 
-        # Standard check: is the action type allowed?
-        if action_type not in allowed_actions:
-            return {
-                "decision": "QUARANTINE",
-                "reason": f"Action '{action_type}' is not authorized by the user prompt intent."
-            }
+        # ── Step 1: Resolve action_type → category via taxonomy ──
+        action_category = ACTION_TYPE_TO_CATEGORY.get(action_type)
 
-        # Target-specific checks
-        if restricted_targets:
-            # Check if any restricted targets are in the current action target
-            matched = False
-            for t in restricted_targets:
-                if t.lower() in target.lower() or target.lower() in t.lower():
-                    matched = True
-                    break
-            
-            # For actions like read_file, fetch_url, or run_command, if targets were specified, limit to those targets
-            if action_type in ["read_file", "write_file", "send_email", "fetch_url", "run_command"] and not matched:
+        # ── Step 2: Unknown action type? Check allowed_actions directly (legacy/LLM fallback) ──
+        if action_category is None:
+            if action_type not in allowed_actions:
                 return {
                     "decision": "QUARANTINE",
-                    "reason": f"Target '{target}' is not authorized by the user prompt intent. Authorized targets: {', '.join(restricted_targets)}"
+                    "reason": f"Action '{action_type}' is not authorized by the user prompt intent."
+                }
+            action_category = action_type  # treat as its own category
+
+        # ── Step 3: Category authorization ──
+        if action_category not in allowed_categories:
+            # LLM path may only have 'allowed_actions' — check there too
+            if action_type not in allowed_actions:
+                return {
+                    "decision": "QUARANTINE",
+                    "reason": f"Action '{action_type}' (category: {action_category}) is not authorized."
                 }
 
-        # If LLM keys are available, run a semantic audit check for critical/sensitive actions
+        # ── Step 4: Target restriction (category-driven, not hardcoded list) ──
+        FILE_OPERATION_CATEGORIES = {"file_read", "file_write", "email", "network", "execution"}
+        if restricted_targets and action_category in FILE_OPERATION_CATEGORIES:
+            matched = False
+            for t in restricted_targets:
+                if not target or target.strip() == "":
+                    continue
+                # Prevent empty or single-character bypasses in substring comparisons
+                if t.lower() in target.lower() or (len(target.strip()) >= 3 and target.lower() in t.lower()):
+                    matched = True
+                    break
+            if not matched:
+                return {
+                    "decision": "QUARANTINE",
+                    "reason": f"Target '{target}' is not authorized. Authorized: {', '.join(restricted_targets)}"
+                }
+
+        # ── Step 5: LLM re-check for critical/sensitive actions ──
         if action_type in ["run_command", "send_email"] and (self.gemini_key or self.openai_key):
             try:
                 return self._evaluate_with_llm(manifest.get("user_prompt", ""), action_type, target, parameters)
@@ -105,39 +159,72 @@ class LocalEvaluationEngine:
             "reason": f"Action '{action_type}' with target '{target}' matches intent manifest."
         }
 
-    def _extract_heuristics(self, prompt: str) -> Dict[str, Any]:
+    def _extract_taxonomy(self, prompt: str) -> Dict[str, Any]:
         prompt_lower = prompt.lower()
-        allowed = []
+        allowed_categories = set()
         targets = []
 
-        # Heuristic actions detection
-        if any(w in prompt_lower for w in ["read", "view", "open", "cat", "print", "file", "text"]):
-            allowed.append("read_file")
-        if any(w in prompt_lower for w in ["write", "create", "save", "make", "output", "update"]):
-            allowed.append("write_file")
-        if any(w in prompt_lower for w in ["email", "mail", "send", "notify"]):
-            allowed.append("send_email")
-        if any(w in prompt_lower for w in ["http", "url", "web", "fetch", "get", "download", "scrape"]):
-            allowed.append("fetch_url")
-        if any(w in prompt_lower for w in ["run", "execute", "bash", "shell", "command", "terminal"]):
-            allowed.append("run_command")
-        
-        # Heuristically add custom action
-        allowed.append("custom_action")
+        # ── Keywords map to CATEGORIES, not individual action types ──
+        # file_read
+        if any(w in prompt_lower for w in [
+            "read", "view", "open", "cat", "print", "file", "text",
+            "list", "show", "display", "inspect", "check",
+        ]):
+            allowed_categories.add("file_read")
 
-        # Basic target extraction (looks for filename patterns or domain names)
+        # file_write
+        if any(w in prompt_lower for w in [
+            "write", "create", "save", "make", "output", "update",
+            "delete", "remove", "trash", "erase", "destroy",
+            "copy", "move", "rename", "upload", "append", "edit",
+            "modify", "change", "add", "insert",
+        ]):
+            allowed_categories.add("file_write")
+
+        # email
+        if any(w in prompt_lower for w in [
+            "email", "mail", "send", "notify", "message", "inbox",
+            "outbox",
+        ]):
+            allowed_categories.add("email")
+
+        # network
+        if any(w in prompt_lower for w in [
+            "http", "url", "web", "fetch", "get", "download", "scrape",
+            "api", "call", "invoke", "request", "upload", "endpoint",
+            "crawl",
+        ]):
+            allowed_categories.add("network")
+
+        # execution
+        if any(w in prompt_lower for w in [
+            "run", "execute", "bash", "shell", "command", "terminal",
+            "script", "code", "python", "node", "process", "launch",
+            "spawn",
+        ]):
+            allowed_categories.add("execution")
+
+        # ── Expand categories to concrete action types (backward compat) ──
+        allowed_actions = []
+        for cat in allowed_categories:
+            allowed_actions.extend(ACTION_TAXONOMY.get(cat, []))
+
+        # Heuristically add custom action to actions (backward compat)
+        allowed_actions.append("custom_action")
+
+        # ── Target extraction (unchanged) ──
         file_matches = re.findall(r'[\w\-]+\.[a-zA-Z0-9]+', prompt)
         if file_matches:
             targets.extend(file_matches)
-
         email_matches = re.findall(r'[\w\.-]+@[\w\.-]+', prompt)
         if email_matches:
             targets.extend(email_matches)
 
         return {
             "user_prompt": prompt,
-            "allowed_actions": list(set(allowed)),
-            "restricted_targets": list(set(targets))
+            "allowed_actions": list(set(allowed_actions)),
+            "allowed_categories": list(allowed_categories),
+            "restricted_targets": list(set(targets)),
         }
 
     def _extract_with_gemini(self, prompt: str) -> Dict[str, Any]:
@@ -147,7 +234,8 @@ class LocalEvaluationEngine:
         system_instruction = (
             "You are the ARGUS security intent extractor. Analyze the user prompt and identify "
             "what general action categories and targets are authorized by the user.\n"
-            "Action categories MUST be selected from: ['read_file', 'write_file', 'send_email', 'fetch_url', 'run_command', 'custom_action'].\n"
+            "Action categories MUST be selected from: ['file_read', 'file_write', 'email', 'network', 'execution', 'custom'].\n"
+            "For each authorized action, determine which category it belongs to.\n"
             "restricted_targets MUST extract all specific files, directories, email addresses, domains, or URLs explicitly mentioned in the user prompt as allowed targets."
         )
 
@@ -164,12 +252,16 @@ class LocalEvaluationEngine:
                             "type": "ARRAY",
                             "items": {"type": "STRING"}
                         },
+                        "allowed_categories": {
+                            "type": "ARRAY",
+                            "items": {"type": "STRING"}
+                        },
                         "restricted_targets": {
                             "type": "ARRAY",
                             "items": {"type": "STRING"}
                         }
                     },
-                    "required": ["allowed_actions", "restricted_targets"]
+                    "required": ["allowed_actions", "allowed_categories", "restricted_targets"]
                 }
             }
         }
@@ -190,9 +282,9 @@ class LocalEvaluationEngine:
         system_instruction = (
             "You are the ARGUS security intent extractor. Analyze the user prompt and identify "
             "what general action categories and targets are authorized by the user.\n"
-            "Action categories MUST be selected from: ['read_file', 'write_file', 'send_email', 'fetch_url', 'run_command', 'custom_action'].\n"
+            "Action categories MUST be selected from: ['file_read', 'file_write', 'email', 'network', 'execution', 'custom'].\n"
             "restricted_targets MUST extract all specific files, directories, email addresses, domains, or URLs explicitly mentioned in the user prompt as allowed targets.\n"
-            "Respond ONLY as a JSON object with keys 'allowed_actions' (list of strings) and 'restricted_targets' (list of strings)."
+            "Respond ONLY as a JSON object with keys 'allowed_actions' (list of strings), 'allowed_categories' (list of strings), and 'restricted_targets' (list of strings)."
         )
 
         payload = {
