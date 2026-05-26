@@ -24,21 +24,77 @@
 
 ## The Problem Nobody Is Solving
 
-Every security tool watches what users **say** to AI. Nobody watches what AI **does** next.
+Every security tool on the market watches what users **say** to AI. Nobody watches what AI **does** next. 
 
 ```
 Current Security (Everyone Else):
 User → [INPUT SECURITY] → LLM → Output → Action
               ↑
        "Is this prompt safe?"
+```
 
-ARGUS Security:
+If an attacker embeds a malicious instruction (like data exfiltration or credential swapping) inside a customer complaint email, your input security filters will completely miss it. Your LLM agent will process the email, follow the injected instructions, and execute the harmful tool call.
+
+## What is ARGUS & How it Solves This?
+
+**ARGUS** (**A**gent **R**untime **G**uardrail & **U**nauthorized-action **S**topper) is a dynamic pre-action authorization firewall for autonomous AI agents. 
+
+Instead of trying to predict or block prompt injections at the input layer (which are easily bypassed), ARGUS shifts defense to the **action layer**:
+
+1. **Intent Extraction:** The moment a user issues an instruction, ARGUS dynamically extracts a cryptographically signed permission slip (Intent Manifest) specifying what actions and targets are authorized.
+2. **Pre-Action Gatekeeper:** Every tool call the agent proposes is evaluated in real-time against this manifest *before* execution. If the action target or parameter deviates, the gateway halts execution and quarantines it for review.
+
+```
+ARGUS:
 User → Intent Extraction → LLM → Action → [ACTION SECURITY]
                                         ↑
                                "Does this action match what the user wanted?"
 ```
 
-An attacker embeds hidden instructions in an email — every input security tool misses it. ARGUS catches it at the action layer.
+## Data Flow
+
+ARGUS processes all agent actions through a hardened 5-layer pipeline combining offline local preflight gating with remote cryptographic verification and semantic classification:
+
+```mermaid
+graph TD
+    %% Styling
+    classDef default fill:#111,stroke:#333,stroke-width:1px,color:#ddd;
+    classDef highlight fill:#1e1b4b,stroke:#6366f1,stroke-width:2px,color:#fff;
+    classDef quarantine fill:#450a0a,stroke:#ef4444,stroke-width:2px,color:#fca5a5;
+    classDef green fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0;
+    
+    A["User Input<br/>'Extract logs from log.txt'"] --> B["Layer 1: Intent Extractor<br/>(Gemini Flash)"]
+    B --> C["AWT Cryptographic Signing<br/>(HMAC-SHA256 Server Secret)"]
+    C --> D["SDK Local Preflight Check<br/>(0ms client boundary)"]
+    
+    %% Local Preflight Checks
+    D --> D1{"Is signature valid?"}
+    D1 -- "No / Tampered" --> Q["Fail-Secure Quarantine<br/>(Human Review Queue)"]
+    D1 -- "Yes" --> D2{"Is target in manifest?"}
+    D2 -- "No (Out of Scope / ../secrets)" --> Q
+    D2 -- "Yes (log.txt)" --> E["Payload Normalizer<br/>(Anti-Obfuscation Scanner)"]
+    
+    %% Normalization
+    E --> E1["Decodes URL, Hex, Base64<br/>& Space Obfuscation"]
+    E1 --> F["Layer 2: Lobster Trap Proxy<br/>(Evaluation Engine)"]
+    
+    %% Enforcement
+    F --> G{"API Key Present?"}
+    G -- "Yes" --> H["Llama-Guard AI Inspector<br/>(Async Worker Thread)"]
+    G -- "No (Offline)" --> I["Deterministic Regex Heuristics<br/>(Pattern Scanning)"]
+    
+    H & I --> J{"Risk Score < 0.70?"}
+    J -- "No (Critical Hazard)" --> Q
+    J -- "Yes (Safe Action)" --> K["Allowed Tool Execution<br/>(Audit Log dual-write)"]
+    
+    %% Quarantine Workflow
+    Q --> L["Layer 3: Explanation Engine<br/>(Gemini Pro Plain-English explanation)"]
+    L --> M["Layer 4: Human Gate<br/>(Review Queue - Approve/Deny)"]
+    
+    class B,D,E,F highlight;
+    class Q quarantine;
+    class K green;
+```
 
 ## Quick Start
 
@@ -159,19 +215,19 @@ ARGUS incorporates critical, production-ready security layers to protect agents 
 
 ARGUS is verified both semantically and empirically using rigorous local and remote testing methodologies:
 
-### 📈 Scale Randomized Benchmarking (2,240 Test Cases)
+### Scale Randomized Benchmarking (2,240 Test Cases)
 We programmatically synthesized **2,240 distinct, randomized scenarios** across 5 business domains using the local offline heuristic engine to measure enforcer reliability at scale:
 * **Global Accuracy:** **92.86%**
 * **Recall (Safety Shielding):** **100.00%** (Zero false negatives or safety leaks!)
 * **Precision:** **90.00%**
 * **Average Latency:** **<0.01 ms** (using ultra-fast local deterministic enforcer fallback)
 
-### 🤖 Live ReAct Agent Prompt Injection Simulation
+### Live ReAct Agent Prompt Injection Simulation
 We constructed a live autonomous ReAct loop calling Google Gemini Flash to observe ARGUS active shielding in action:
 * **Benign Path:** Safe tasks (such as summarizing authorized files) execute seamlessly.
 * **Attack Path:** Indirect prompt injection attempts (e.g. attempting to read `secrets.txt` via hidden third-party instructions in referral notes) are intercepted in-flight by Layer 2 (Lobster Trap) and safely terminated.
 
-### 🖥️ Timed Playground & Review Queue
+### Timed Playground & Review Queue
 The developer dashboard features a **Live Playground** running a timed sequential log execution simulation comparing the **Unprotected Agent (Unsafe)** and the **ARGUS Protected Agent (Safe)** side-by-side. Quarantined actions immediately propagate to the shared **Review Queue** database for human-in-the-loop audit, claimed ownership, and override authorization.
 
 ## Key Differentiators
