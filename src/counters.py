@@ -1,6 +1,11 @@
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+# Global variable to track the current date for resetting 'actions_today' daily
+_current_day = datetime.now(timezone.utc).date().isoformat()
+
 
 
 @dataclass
@@ -42,7 +47,13 @@ async def increment_sessions():
 
 
 async def increment_actions():
+    global _current_day
     async with _lock:
+        today = datetime.now(timezone.utc).date().isoformat()
+        if today != _current_day:
+            _current_day = today
+            _counters.actions_today = 0
+            _counters.total_response_time_ms = 0.0
         _counters.actions_today += 1
 
 

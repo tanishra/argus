@@ -505,27 +505,29 @@ class LobsterTrapEngine:
         score = 0.0
         detected_signals = []
 
+        # Normalize the target and parameters to close obfuscation evasion vectors
+        target_normalized = self._normalize_payload(action.target).lower()
+        params_normalized = self._normalize_payload(json.dumps(action.parameters)).lower()
+
         # Check target for external domains
         external_domains = ["gmail.com", "yahoo.com", "hotmail.com"]
         for domain in external_domains:
-            if domain in action.target.lower():
+            if domain in target_normalized:
                 detected_signals.append(f"external_domain:{domain}")
                 score += 0.3
 
-        target_lower = action.target.lower()
         import re
 
-        if re.search(r"\bexternal\b", target_lower):
+        if re.search(r"\bexternal\b", target_normalized):
             detected_signals.append("external_domain:external")
             score += 0.3
-        if re.search(r"\bbackup\b", target_lower):
+        if re.search(r"\bbackup\b", target_normalized):
             detected_signals.append("external_domain:backup")
             score += 0.3
 
         # Check parameters for bulk operations
-        params_text = json.dumps(action.parameters).lower()
         for signal in self.exfiltration_signals:
-            if signal in params_text:
+            if signal in params_normalized:
                 detected_signals.append(f"exfil_signal:{signal}")
                 score += 0.2
 

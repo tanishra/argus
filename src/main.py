@@ -343,7 +343,14 @@ async def extract_intent(
     # Cryptographically sign the manifest using HMAC-SHA256 (Agent Web Token pattern)
     import hmac
     import hashlib
-    secret_key = os.getenv("ARGUS_SIGNING_KEY", "argus-default-secret-key-for-manifest-signing")
+    secret_key = os.getenv("ARGUS_SIGNING_KEY")
+    if not secret_key:
+        if os.getenv("DEMO_MODE", "true").lower() == "false":
+            raise HTTPException(
+                status_code=500,
+                detail="Security Exception: ARGUS_SIGNING_KEY must be configured in production mode."
+            )
+        secret_key = "argus-default-secret-key-for-manifest-signing"
     clean_dict = {k: v for k, v in manifest_dict.items() if k != "signature"}
     serialized = json.dumps(clean_dict, sort_keys=True).encode('utf-8')
     manifest_dict["signature"] = hmac.new(secret_key.encode(), serialized, hashlib.sha256).hexdigest()
@@ -417,7 +424,7 @@ async def evaluate_action(
     await counters.increment_actions()
 
     # Evaluate through Lobster Trap
-    evaluation = _lobster_proxy.process_action(manifest, action)
+    evaluation = await asyncio.to_thread(_lobster_proxy.process_action, manifest, action)
     await counters.add_response_time(evaluation.evaluation_time_ms)
 
     if evaluation.decision in [Decision.QUARANTINE, Decision.DENY]:
