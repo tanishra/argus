@@ -141,7 +141,8 @@ class LocalEvaluationEngine:
         }
 
     def _extract_with_gemini(self, prompt: str) -> Dict[str, Any]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.gemini_key}"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+        headers = {"x-goog-api-key": self.gemini_key}
         
         system_instruction = (
             "You are the ARGUS security intent extractor. Analyze the user prompt and identify "
@@ -173,7 +174,7 @@ class LocalEvaluationEngine:
             }
         }
 
-        resp = httpx.post(url, json=payload, timeout=10.0)
+        resp = httpx.post(url, json=payload, headers=headers, timeout=10.0)
         resp.raise_for_status()
         data = resp.json()
         
@@ -227,7 +228,8 @@ class LocalEvaluationEngine:
         ).format(prompt=prompt, action_type=action_type, target=target, params=json.dumps(parameters))
 
         if self.gemini_key:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.gemini_key}"
+            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            headers = {"x-goog-api-key": self.gemini_key}
             payload = {
                 "contents": [{"parts": [{"text": system_instruction}]}],
                 "generationConfig": {
@@ -242,7 +244,7 @@ class LocalEvaluationEngine:
                     }
                 }
             }
-            resp = httpx.post(url, json=payload, timeout=5.0)
+            resp = httpx.post(url, json=payload, headers=headers, timeout=5.0)
             resp.raise_for_status()
             text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             return json.loads(text)

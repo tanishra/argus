@@ -72,10 +72,6 @@ class AsyncLocalClientWrapper:
 
 
 def _parse_scope_to_targets(scope) -> list:
-    import json
-    import os
-    import re
-
     if not scope:
         return []
 
@@ -170,7 +166,13 @@ def _verify_manifest_signature(manifest: Optional[Dict[str, Any]]) -> None:
     import hashlib
     import json
 
-    secret_key = os.getenv("ARGUS_SIGNING_KEY", "argus-default-secret-key-for-manifest-signing")
+    secret_key = os.getenv("ARGUS_SIGNING_KEY")
+    if not secret_key:
+        if os.getenv("DEMO_MODE", "true").lower() == "false":
+            raise ArgusException(
+                "Security Exception: ARGUS_SIGNING_KEY must be configured in production mode."
+            )
+        secret_key = "argus-default-secret-key-for-manifest-signing"
     # Clean dictionary by removing the signature field itself
     clean_dict = {k: v for k, v in manifest.items() if k != "signature"}
     serialized = json.dumps(clean_dict, sort_keys=True).encode('utf-8')

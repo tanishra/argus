@@ -11,9 +11,16 @@ class ArgusClient:
     """
 
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        self.base_url = (base_url or os.getenv("ARGUS_BASE_URL", "https://tanishrajput-argus.hf.space")).rstrip(
-            "/"
-        )
+        import warnings
+        env_url = os.getenv("ARGUS_BASE_URL")
+        if not base_url and not env_url:
+            warnings.warn(
+                "ARGUS Warning: Defaulting base_url to the public Hugging Face Space (https://tanishrajput-argus.hf.space). "
+                "For local/production safety and privacy, configure ARGUS_BASE_URL=http://localhost:8000.",
+                UserWarning,
+                stacklevel=2
+            )
+        self.base_url = (base_url or env_url or "https://tanishrajput-argus.hf.space").rstrip("/")
         self.api_key = api_key or os.getenv("ARGUS_API_KEY", "")
 
         headers = {}
@@ -80,9 +87,16 @@ class AsyncArgusClient:
     """
 
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        self.base_url = (base_url or os.getenv("ARGUS_BASE_URL", "https://tanishrajput-argus.hf.space")).rstrip(
-            "/"
-        )
+        import warnings
+        env_url = os.getenv("ARGUS_BASE_URL")
+        if not base_url and not env_url:
+            warnings.warn(
+                "ARGUS Warning: Defaulting base_url to the public Hugging Face Space (https://tanishrajput-argus.hf.space). "
+                "For local/production safety and privacy, configure ARGUS_BASE_URL=http://localhost:8000.",
+                UserWarning,
+                stacklevel=2
+            )
+        self.base_url = (base_url or env_url or "https://tanishrajput-argus.hf.space").rstrip("/")
         self.api_key = api_key or os.getenv("ARGUS_API_KEY", "")
 
         headers = {}
