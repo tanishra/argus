@@ -103,7 +103,8 @@ const tocItems: Record<string, { id: string; label: string }[]> = {
     { id: 'gateway-env', label: '1. Gateway Configs' },
     { id: 'sdk-env', label: '2. SDK Variables' },
     { id: 'mode-configs', label: '3. Mode Profiles' },
-    { id: 'dashboard-modes', label: '4. Dashboard Triage' }
+    { id: 'dashboard-modes', label: '4. Dashboard Triage' },
+    { id: 'action-taxonomy-docs', label: '5. Action Taxonomy' }
   ],
   vanilla: [
     { id: 'vanilla-overview', label: 'Custom Decorators' },
@@ -804,6 +805,56 @@ REDIS_URL=disabled`}
                   </ul>
                 </div>
               </div>
+              
+              <h3 id="action-taxonomy-docs" className="text-2xl font-bold tracking-tight text-foreground mb-4 mt-8">5. Action Taxonomy & Mismatch Validation</h3>
+              <p className="text-base text-muted-foreground leading-relaxed mb-4 font-light">
+                To guarantee bulletproof validation without infinite code modifications for new tools, ARGUS groups individual tool actions into <b>5 stable capability categories</b>. Runtime target validation checks ensure the developer-configured target type aligns perfectly with the action's capability category.
+              </p>
+
+              <div className="overflow-hidden border border-border rounded-lg my-6">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-border text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Category</th>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Expected Target Type</th>
+                        <th className="px-6 py-3 text-left font-medium text-muted-foreground">Mapped SDK Actions (Examples)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border bg-transparent font-light text-muted-foreground">
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">file_read</td>
+                        <td className="px-6 py-4 font-mono text-emerald-500">file</td>
+                        <td className="px-6 py-4"><code>read_file</code>, <code>open_file</code>, <code>view_file</code>, <code>list_dir</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">file_write</td>
+                        <td className="px-6 py-4 font-mono text-emerald-500">file</td>
+                        <td className="px-6 py-4"><code>write_file</code>, <code>create_file</code>, <code>delete_file</code>, <code>remove_file</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">email</td>
+                        <td className="px-6 py-4 font-mono text-sky-500">email</td>
+                        <td className="px-6 py-4"><code>send_email</code>, <code>notify_user</code>, <code>message</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">network</td>
+                        <td className="px-6 py-4 font-mono text-amber-500">api / url</td>
+                        <td className="px-6 py-4"><code>fetch_url</code>, <code>make_api_call</code>, <code>http_request</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">execution</td>
+                        <td className="px-6 py-4 font-mono text-rose-500">shell</td>
+                        <td className="px-6 py-4"><code>run_command</code>, <code>execute_code</code>, <code>run_script</code>, <code>bash</code></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <AlertBlock type="warning" title="Developer Mismatch Warnings">
+                The <code>@argus.protect</code> decorator automatically validates your tool configuration. If you configure a tool with a mismatching target type (e.g. declaring a <code>file_write</code> action but setting <code>target_type="shell"</code>), the SDK logs a runtime configuration warning to prevent security vulnerabilities and ensure developers audit their tool boundaries.
+              </AlertBlock>
 
               <PaginationFooter />
             </article>
