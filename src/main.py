@@ -338,9 +338,19 @@ async def extract_intent(
         user_id=intent_req.user_id,
     )
 
+    manifest_dict = result.manifest.to_dict()
+    
+    # Cryptographically sign the manifest using HMAC-SHA256 (Agent Web Token pattern)
+    import hmac
+    import hashlib
+    secret_key = os.getenv("ARGUS_SIGNING_KEY", "argus-default-secret-key-for-manifest-signing")
+    clean_dict = {k: v for k, v in manifest_dict.items() if k != "signature"}
+    serialized = json.dumps(clean_dict, sort_keys=True).encode('utf-8')
+    manifest_dict["signature"] = hmac.new(secret_key.encode(), serialized, hashlib.sha256).hexdigest()
+
     return {
         "session_id": result.manifest.session_id,
-        "manifest": result.manifest.to_dict(),
+        "manifest": manifest_dict,
         "confidence": result.confidence,
         "extraction_time_ms": result.extraction_time_ms,
         "warnings": result.warnings,

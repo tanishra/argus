@@ -1,12 +1,48 @@
 import functools
 import inspect
 import json
+import logging
 from typing import Any, Callable, Dict, Optional, TypeVar, cast
+
+logger = logging.getLogger("argus.sdk")
 
 from .exceptions import ArgusException, ArgusQuarantineException
 from .session import get_current_session
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def _unpack_json_target(target_val: str) -> str:
+    target_keys = ["filename", "file_name", "file", "path", "target", "destination", "url", "to", "recipient"]
+    for _ in range(3):
+        cleaned_target = target_val.strip()
+        if cleaned_target.startswith("[") and cleaned_target.endswith("]"):
+            try:
+                parsed_list = json.loads(cleaned_target)
+                if isinstance(parsed_list, list) and len(parsed_list) > 0:
+                    target_val = str(parsed_list[0])
+                    continue
+            except json.JSONDecodeError as e:
+                logger.debug("Failed to decode target JSON array: %s", e)
+            inner = cleaned_target[1:-1].strip().strip("'\"")
+            if inner:
+                target_val = inner
+                continue
+        if cleaned_target.startswith("{") and cleaned_target.endswith("}"):
+            try:
+                parsed = json.loads(cleaned_target)
+                found_subkey = False
+                for tk in target_keys:
+                    if tk in parsed:
+                        target_val = str(parsed[tk])
+                        found_subkey = True
+                        break
+                if found_subkey:
+                    continue
+            except json.JSONDecodeError as e:
+                logger.debug("Failed to decode target JSON object: %s", e)
+        break
+    return target_val
 
 
 def protect(
@@ -48,36 +84,8 @@ def protect(
                 # Fallback to first parameter
                 target_val = str(next(iter(params.values())))
 
-            # Dynamic JSON string and list parsing check (common in ReAct/structured agents passing stringified inputs)
-            target_keys = ["filename", "file_name", "file", "path", "target", "destination", "url", "to", "recipient"]
-            for _ in range(3):
-                cleaned_target = target_val.strip()
-                if cleaned_target.startswith("[") and cleaned_target.endswith("]"):
-                    try:
-                        parsed_list = json.loads(cleaned_target)
-                        if isinstance(parsed_list, list) and len(parsed_list) > 0:
-                            target_val = str(parsed_list[0])
-                            continue
-                    except Exception:
-                        pass
-                    inner = cleaned_target[1:-1].strip().strip("'\"")
-                    if inner:
-                        target_val = inner
-                        continue
-                if cleaned_target.startswith("{") and cleaned_target.endswith("}"):
-                    try:
-                        parsed = json.loads(cleaned_target)
-                        found_subkey = False
-                        for tk in target_keys:
-                            if tk in parsed:
-                                target_val = str(parsed[tk])
-                                found_subkey = True
-                                break
-                        if found_subkey:
-                            continue
-                    except Exception:
-                        pass
-                break
+            # Consolidate target unpacking logic to avoid tech debt
+            target_val = _unpack_json_target(target_val)
 
             # Zero-latency Local Preflight Check (Defense in Depth)
             preflight_resp = session.local_preflight_check(action_type, target_val, target_type)
@@ -128,36 +136,8 @@ def protect(
             elif params:
                 target_val = str(next(iter(params.values())))
 
-            # Dynamic JSON string and list parsing check (common in ReAct/structured agents passing stringified inputs)
-            target_keys = ["filename", "file_name", "file", "path", "target", "destination", "url", "to", "recipient"]
-            for _ in range(3):
-                cleaned_target = target_val.strip()
-                if cleaned_target.startswith("[") and cleaned_target.endswith("]"):
-                    try:
-                        parsed_list = json.loads(cleaned_target)
-                        if isinstance(parsed_list, list) and len(parsed_list) > 0:
-                            target_val = str(parsed_list[0])
-                            continue
-                    except Exception:
-                        pass
-                    inner = cleaned_target[1:-1].strip().strip("'\"")
-                    if inner:
-                        target_val = inner
-                        continue
-                if cleaned_target.startswith("{") and cleaned_target.endswith("}"):
-                    try:
-                        parsed = json.loads(cleaned_target)
-                        found_subkey = False
-                        for tk in target_keys:
-                            if tk in parsed:
-                                target_val = str(parsed[tk])
-                                found_subkey = True
-                                break
-                        if found_subkey:
-                            continue
-                    except Exception:
-                        pass
-                break
+            # Consolidate target unpacking logic to avoid tech debt
+            target_val = _unpack_json_target(target_val)
 
             # Zero-latency Local Preflight Check (Defense in Depth)
             preflight_resp = session.local_preflight_check(action_type, target_val, target_type)

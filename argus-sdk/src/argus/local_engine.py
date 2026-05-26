@@ -2,10 +2,13 @@ import os
 import uuid
 import json
 import re
+import logging
 from typing import Dict, Any, Optional, List
 import httpx
 
 from .exceptions import ArgusException
+
+logger = logging.getLogger("argus.local_engine")
 
 
 class LocalEvaluationEngine:
@@ -29,9 +32,10 @@ class LocalEvaluationEngine:
                     "session_id": session_id,
                     "manifest": self._extract_with_gemini(user_prompt)
                 }
-            except Exception:
-                # Fallback to heuristic if API call fails
-                pass
+            except httpx.HTTPError as e:
+                logger.warning("Local Gemini intent extraction failed, falling back to heuristics: %s", e)
+            except Exception as e:
+                logger.error("Unexpected error during local Gemini intent extraction: %s", e)
 
         if self.openai_key:
             try:
@@ -39,9 +43,10 @@ class LocalEvaluationEngine:
                     "session_id": session_id,
                     "manifest": self._extract_with_openai(user_prompt)
                 }
-            except Exception:
-                # Fallback to heuristic
-                pass
+            except httpx.HTTPError as e:
+                logger.warning("Local OpenAI intent extraction failed, falling back to heuristics: %s", e)
+            except Exception as e:
+                logger.error("Unexpected error during local OpenAI intent extraction: %s", e)
 
         # 2. Heuristic rule extraction (fully offline, zero cost)
         return {
@@ -90,8 +95,10 @@ class LocalEvaluationEngine:
         if action_type in ["run_command", "send_email"] and (self.gemini_key or self.openai_key):
             try:
                 return self._evaluate_with_llm(manifest.get("user_prompt", ""), action_type, target, parameters)
-            except Exception:
-                pass
+            except httpx.HTTPError as e:
+                logger.warning("Local semantic action audit check failed, falling back to heuristics: %s", e)
+            except Exception as e:
+                logger.error("Unexpected error during local semantic action audit: %s", e)
 
         return {
             "decision": "ALLOW",
