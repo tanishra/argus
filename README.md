@@ -145,6 +145,16 @@ curl -X POST http://localhost:8000/api/action/evaluate \
 }
 ```
 
+## Enterprise Hardening Features
+
+ARGUS incorporates critical, production-ready security layers to protect agents under brutal multi-agent conspiracy and obfuscated injection attacks:
+
+* **Agent Web Token (AWT) Cryptographic Manifests:** The backend HMAC-SHA256 signs the Intent Manifest, and the SDK verifies this signature locally before executing any agent tool call. This prevents middleman tampering or forged manifests, completely failing closed in production if unsigned.
+* **Payload Normalizer (Obfuscation Protection):** Automatically decodes URL-encoding, Hex sequences, Base64 strings, and space-separated obfuscations (e.g. `i g n o r e`) before passing arguments to the policy evaluator, closing critical security evasion loopholes.
+* **Llama-Guard Semantic Classifier:** Integrates semantic LLM classification to audit actions against the standard Llama-Guard risk taxonomy (Cyberattacks, Prompt Injections, Privilege Escalation).
+* **Production Session Tuning:** Explicit Redis connection pooling (50 max connections, keepalives, socket timeouts) and size-limited memory LRU cache to prevent backend OOM leaks under high concurrent loads.
+* **Zero-latency Local Preflight Enforcer:** Robust multi-format scope parsing and iterative JSON target unpacking to catch out-of-scope targets and absolute path traversal attempts locally at the SDK boundary in 0ms.
+
 ## Empirical Validation & Scale Testing
 
 ARGUS is verified both semantically and empirically using rigorous local and remote testing methodologies:
