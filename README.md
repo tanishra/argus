@@ -127,7 +127,7 @@ uv run pytest tests/ -v
 ruff check src/
 ```
 
-## Architecture
+## System Architecture
 
 ```mermaid
 flowchart TB

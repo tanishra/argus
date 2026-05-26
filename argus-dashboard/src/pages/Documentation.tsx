@@ -401,6 +401,9 @@ export default function Documentation() {
               <AlertBlock type="note" title="Failsafe Boundary Security">
                 If an agent tries to invoke a tool wrapped with <code>@argus.protect</code> without first creating a valid <code>argus.Session</code> context, ARGUS fails secure by throwing a fatal <code>ArgusException</code> instantly.
               </AlertBlock>
+              <AlertBlock type="warning" title="Agent Web Token (AWT) Verification">
+                In production mode, every Intent Manifest is <strong>HMAC-SHA256 signed</strong> by the gateway using <code>ARGUS_SIGNING_KEY</code>. The SDK verifies this signature before executing any tool call. If the manifest is tampered with or unsigned, execution is refused. This prevents middleman attacks and forged manifests.
+              </AlertBlock>
 
               <PaginationFooter />
             </article>
@@ -621,6 +624,11 @@ export ARGUS_API_KEY="my-local-gateway-password"`}
                         <td className="px-6 py-4 font-mono">./configs/lobstertrap_policy.yaml</td>
                         <td className="px-6 py-4">Path to the YAML file describing first-match-wins safety rule definitions.</td>
                       </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_SIGNING_KEY</td>
+                        <td className="px-6 py-4 font-mono">None</td>
+                        <td className="px-6 py-4">HMAC-SHA256 secret used to sign Intent Manifests (Agent Web Tokens). <strong>Required in production mode</strong> — the gateway refuses to start without it.</td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -656,6 +664,11 @@ export ARGUS_API_KEY="my-local-gateway-password"`}
                         <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_LOCAL_MODE</td>
                         <td className="px-6 py-4 font-mono">false</td>
                         <td className="px-6 py-4">Set to 'true' to trigger the fully offline, zero-network rule evaluation engine directly on the client machine, skipping all network requests.</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 font-mono font-normal text-foreground">ARGUS_SIGNING_KEY</td>
+                        <td className="px-6 py-4">None</td>
+                        <td className="px-6 py-4">Must match the gateway's signing key. The SDK uses this to verify HMAC-SHA256 signatures on Intent Manifests. <strong>Required in production</strong> — without it, the SDK refuses to execute tools.</td>
                       </tr>
                       <tr>
                         <td className="px-6 py-4 font-mono font-normal text-foreground">GEMINI_API_KEY / OPENAI_API_KEY</td>
@@ -1071,13 +1084,19 @@ with argus.Session("Analyze log file and output report.txt"):
                   <strong className="text-foreground">Prompt Ingestion:</strong> When the user invokes an agent loop inside a <code>with argus.Session(user_prompt)</code> block, the SDK requests Layer 1 (Intent Engine) to extract structured authorization boundaries (Action types, allowed targets, risk scores).
                 </li>
                 <li>
-                  <strong className="text-foreground">Policy Creation:</strong> An Intent Manifest is created dynamically by the flash reasoning LLM and committed securely to the Redis database keyed under the unique <code>session_id</code>.
+                  <strong className="text-foreground">AWT Signing:</strong> The gateway HMAC-SHA256 signs the Intent Manifest using <code>ARGUS_SIGNING_KEY</code>, producing a cryptographic Agent Web Token. The SDK verifies this signature before any tool execution, preventing tampering or forged manifests.
                 </li>
                 <li>
-                  <strong className="text-foreground">Execution Intercept:</strong> The agent runs and attempts to invoke local tools. The decorated function intercepts parameters and sends them immediately to the gateway's `/api/evaluate` endpoint.
+                  <strong className="text-foreground">Policy Creation:</strong> The signed manifest is committed securely to the Redis database keyed under the unique <code>session_id</code>.
                 </li>
                 <li>
-                  <strong className="text-foreground">Microsecond Enforcer (Lobster Trap):</strong> The Gateway compares parameters locally. If they lie within boundaries (e.g. correct recipient email), the call is allowed. If a target mismatch occurs (e.g. wrong file target), a quarantine is issued.
+                  <strong className="text-foreground">Execution Intercept:</strong> The agent runs and attempts to invoke local tools. The decorated function intercepts parameters and sends them immediately to the gateway's <code>/api/evaluate</code> endpoint.
+                </li>
+                <li>
+                  <strong className="text-foreground">Payload Normalization:</strong> Before policy evaluation, all tool arguments are decoded (URL-encoding, hex, Base64, space-separated obfuscation like <code>i g n o r e</code>) to prevent attackers from sneaking past checks with obfuscated strings.
+                </li>
+                <li>
+                  <strong className="text-foreground">Microsecond Enforcer (Lobster Trap):</strong> The Gateway compares normalized parameters against the signed manifest. If they lie within boundaries (e.g. correct recipient email), the call is allowed. If a target mismatch occurs, a quarantine is issued. Critical actions also go through the Llama-Guard semantic classifier.
                 </li>
               </ul>
 
@@ -1103,9 +1122,13 @@ with argus.Session("Analyze log file and output report.txt"):
                 The <strong>Lobster Trap</strong> is an open-source, highly optimized LLM firewall and reverse proxy that sits directly between your AI agent applications and LLM backends (like OpenAI, Anthropic, or Gemini). It conducts active, real-time inspection of prompts and response payloads to catch safety infractions and security violations at the network stream level.
               </p>
 
+              <AlertBlock type="tip" title="v0.2.0 Hardening: Payload Normalization">
+                All tool arguments are now <strong>automatically decoded</strong> (URL-encoding, hex, Base64, space-separated obfuscation) before policy evaluation. This prevents attackers from bypassing checks with obfuscated strings like <code>%2Fetc%2Fpasswd</code> or <code>s e c r e t s . t x t</code>.
+              </AlertBlock>
+
               <h3 id="lobster-speed" className="text-2xl font-bold tracking-tight text-foreground mb-4">Sub-Millisecond Speed</h3>
               <p className="text-base text-muted-foreground leading-relaxed mb-6 font-light">
-                Evaluating safety policies using model API calls is too slow (often &gt; 1s) and introduces massive latency. The Lobster Trap circumvents this entirely by utilizing highly efficient <strong>compiled regex patterns</strong> and pre-compiled semantic rules. This allows the engine to inspect and enforce policies with a latency of <strong>less than 1 millisecond</strong>, making it highly resilient for production-level workloads.
+                Evaluating safety policies using model API calls is too slow (often &gt; 1s) and introduces massive latency. The Lobster Trap circumvents this entirely by utilizing highly efficient <strong>compiled regex patterns</strong> and pre-compiled semantic rules. This allows the engine to inspect and enforce policies with a latency of <strong>less than 1 millisecond</strong>, making it highly resilient for production-level workloads. Heavy policy evaluations run in a <strong>dedicated thread pool</strong> via <code>asyncio.to_thread</code> to prevent event loop blocking.
               </p>
 
               <h3 id="lobster-go" className="text-2xl font-bold tracking-tight text-foreground mb-4">Go Binary Architecture</h3>
@@ -1117,6 +1140,10 @@ with argus.Session("Analyze log file and output report.txt"):
               <p className="text-base text-muted-foreground leading-relaxed mb-6 font-light">
                 Policies are configured in a standard, first-match-wins YAML file. Supported engine actions include standard <code>ALLOW</code>, <code>DENY</code>, <code>RATE_LIMIT</code>, <code>LOG</code>, and <code>QUARANTINE</code> directives.
               </p>
+
+              <AlertBlock type="note" title="Llama-Guard Semantic Classifier">
+                For high-risk actions, the engine also invokes a <strong>semantic LLM classifier</strong> aligned with the Llama-Guard risk taxonomy (Cyberattacks, Prompt Injections, Privilege Escalation) to catch sophisticated attacks that evade heuristic pattern matching.
+              </AlertBlock>
 
               <div className="border-t border-border pt-6 mt-8">
                 <span className="text-sm text-muted-foreground leading-relaxed">
